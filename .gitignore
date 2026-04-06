@@ -1,0 +1,42 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+dev-debug.log
+
+# Dependency directories
+node_modules/
+
+# Environment variables
+.env
+
+# Editor directories and files
+.idea
+.vscode
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS specific
+.DS_Store
+
+# 회사 소스코드 (커밋 금지)
+reference/
+
+# 빌드 캐시
+.turbo/
+.next/
+.playwright-mcp/
+
+# 개인 설정 / API 키
+.claude/settings.local.json
+.claude/agent-memory/
+.claude/plans/
+.taskmaster/config.json
+
+# 불필요한 파일
+package.json.bak
