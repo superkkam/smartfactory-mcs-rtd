@@ -188,11 +188,21 @@ RTD 노코드 룰 빌더 플랫폼은 스마트팩토리 현장 엔지니어를 
   - 룰 클래스별 평균 소요시간 (ruleClassId 기반)
   - 룰 히트율 순위 (isDispatching=Y 비율, rule_def ruleName 매핑)
 
-- **Task 021: MCS-RTD 이벤트 전송 인터페이스 구현**
+- **Task 021: MCS-RTD 이벤트 전송 인터페이스 구현** ✅ (실데이터 기반 디스패칭 전환 포함)
   - MCS API 연결 상태 표시 (통합 실행 시에만 활성)
   - 디스패칭 결과 → MCS API 전송 로직 구현
   - MCS 반송 완료 이벤트 수신 → 다음 디스패칭 트리거
   - 단독 실행 시 F010 인터페이스 비활성 처리 (환경 변수 기반)
+  - **실데이터 기반 디스패칭 전환 (migration 004)**:
+    - `mcs_carrier` 에 lot_id, lot_state, priority, due_time, process_step 추가
+    - `mcs_equipment` 에 availability, current_load, capacity, recipe_type, last_heartbeat_at 추가
+    - `mcs_equipment_unit` 에 current_carrier_id, reserved_by_command_id, queue_length, last_state_changed_at 추가
+    - `rtd_exec_readonly` RPC 함수 — SELECT-only 안전 실행
+    - `apps/rtd/lib/rule-engine/engine.ts` — 실 룰 실행 엔진 (파라미터 바인딩, filterSequence 체인, jumpNextSequence 분기)
+    - `apps/rtd/lib/rule-engine/mcs-schema-catalog.ts` — 쿼리 빌더/엔진 공용 MCS 테이블·컬럼 카탈로그
+    - 쿼리 빌더(`query-builder-modal.tsx`): DMS_* 더미 → mcs_* 실테이블 전환, 컬럼 드롭다운 연동
+    - 시뮬레이터(`/api/simulate`): rule_running_result 재사용 → 실 엔진 dry-run 실행
+    - 메시지 라우트(`/api/message`): TODO 더미 → rule_object 매핑 조회 + 실 엔진 실행
 
 - **Task 022: 성능 최적화 + Vercel 배포 + CI/CD 구성**
   - Next.js 이미지 최적화, 번들 크기 분석
@@ -231,9 +241,9 @@ RTD 노코드 룰 빌더 플랫폼은 스마트팩토리 현장 엔지니어를 
 | Phase 1: 애플리케이션 골격 구축 | ✅ 완료 | 3 | 3/3 |
 | Phase 2: UI/UX 완성 (더미 데이터) | ✅ 완료 | 8 | 8/8 |
 | Phase 3: 핵심 기능 구현 | ✅ 완료 | 7 | 7/7 |
-| Phase 4: 실시간 모니터링 + 배포 | 진행 중 | 4 | 2/4 |
+| Phase 4: 실시간 모니터링 + 배포 | 진행 중 | 4 | 3/4 |
 | Phase 5: LLM 자연어 룰 생성 (프로토타입) | 대기 | 2 | 0/2 |
-| **합계** | | **24** | **20/24** |
+| **합계** | | **24** | **21/24** |
 
 ---
 
