@@ -1,27 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { runRuleEngine } from '@/lib/rule-engine/engine';
 import type {
   SimulationRequest,
   SimulationResponse,
   SimulationSequenceResult,
   ValidationIssue,
 } from '@workspace/types/rtd';
-
-const DEFAULT_VERSION = '1';
-
-/** DB row → 릴레이션 변환 */
-function toRelation(row: Record<string, unknown>) {
-  return {
-    ruleGroupId:               row.rule_group_id as string,
-    ruleId:                    row.rule_id as string,
-    sequence:                  row.sequence as number,
-    isMandatory:               row.is_mandatory as string,
-    filterSequence:            row.filter_sequence as number | null,
-    jumpNextSequence:          row.jump_next_sequence as number | null,
-    jumpNextSequenceCondition: row.jump_next_sequence_condition as string | null,
-    ruleSortId:                row.rule_sort_id as string | null,
-  };
-}
 
 /** filterSequence 그래프에서 순환 참조 탐지 (DFS) */
 function detectCycles(
@@ -72,7 +57,7 @@ export async function POST(request: NextRequest) {
 
   const supabase = await createClient();
 
-  // ── 1. rule_group 조회 ──────────────────────────────────────
+  // ── 1. rule_group 존재 확인 ──────────────────────────────────
   const { data: groupRow, error: groupError } = await supabase
     .from('rule_group')
     .select('*')
@@ -86,7 +71,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: `룰 그룹 ${ruleGroupId}를 찾을 수 없습니다` }, { status: 404 });
   }
 
-  // ── 2. rule_relation 조회 ───────────────────────────────────
+  // ── 2. 사전 유효성 검증 (rule_relation 구조 검사) ────────────
   const { data: relRows, error: relError } = await supabase
     .from('rule_relation')
     .select('*')
@@ -97,9 +82,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: relError.message }, { status: 500 });
   }
 
-  const relations = (relRows ?? []).map(toRelation);
+  const relations = (relRows ?? []) as Array<Record<string, unknown>>;
 
-  // 릴레이션 없을 때 → 빈 결과 + 경고
   if (relations.length === 0) {
     const response: SimulationResponse = {
       valid: false,
@@ -110,58 +94,24 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(response);
   }
 
-  const ruleIds = relations.map((r) => r.ruleId);
-  const sequenceNums = relations.map((r) => r.sequence);
+  const sequenceNums = relations.map((r) => r.sequence as number);
   const sequenceSet = new Set(sequenceNums);
+  const ruleIds = relations.map((r) => r.rule_id as string);
 
-  // ── 3. rule_def / rule_query / rule_running_result 병렬 조회 ─
-  const [defResult, queryResult, runningResult] = await Promise.all([
-    supabase
-      .from('rule_def')
-      .select('rule_id, rule_name, rule_type')
-      .in('rule_id', ruleIds),
-    supabase
-      .from('rule_query')
-      .select('rule_query_id, rule_query_string')
-      .in('rule_query_id', ruleIds)
-      .eq('rule_query_version', DEFAULT_VERSION),
-    supabase
-      .from('rule_running_result')
-      .select('rule_id, count')
-      .in('rule_id', ruleIds)
-      .order('start_time', { ascending: false }),
-  ]);
+  // 쿼리 정의 여부 확인 (mandatory 경고용)
+  const { data: queryRows } = await supabase
+    .from('rule_query')
+    .select('rule_query_id')
+    .in('rule_query_id', ruleIds);
+  const definedQueryIds = new Set((queryRows ?? []).map((r) => r.rule_query_id as string));
 
-  const defMap = new Map<string, { ruleName: string; ruleType: string }>();
-  for (const row of defResult.data ?? []) {
-    defMap.set(row.rule_id as string, {
-      ruleName: row.rule_name as string,
-      ruleType: row.rule_type as string,
-    });
-  }
-
-  const queryMap = new Map<string, string>();
-  for (const row of queryResult.data ?? []) {
-    queryMap.set(row.rule_query_id as string, row.rule_query_string as string);
-  }
-
-  // 룰별 최신 count (첫 번째 항목 = 가장 최근)
-  const countMap = new Map<string, number>();
-  for (const row of runningResult.data ?? []) {
-    const ruleId = row.rule_id as string;
-    if (!countMap.has(ruleId)) {
-      countMap.set(ruleId, row.count as number);
-    }
-  }
-
-  // ── 4. 유효성 검증 ──────────────────────────────────────────
   const validationIssues: ValidationIssue[] = [];
 
   // filterSequence 순환 참조 탐지
   const filterMap = new Map<number, number>();
   for (const rel of relations) {
-    if (rel.filterSequence != null) {
-      filterMap.set(rel.sequence, rel.filterSequence);
+    if (rel.filter_sequence != null) {
+      filterMap.set(rel.sequence as number, rel.filter_sequence as number);
     }
   }
   const cycles = detectCycles(sequenceNums, filterMap);
@@ -175,55 +125,88 @@ export async function POST(request: NextRequest) {
 
   // 잘못된 filterSequence / jumpNextSequence 참조
   for (const rel of relations) {
-    if (rel.filterSequence != null && !sequenceSet.has(rel.filterSequence)) {
+    const seq = rel.sequence as number;
+    if (rel.filter_sequence != null && !sequenceSet.has(rel.filter_sequence as number)) {
       validationIssues.push({
         severity: 'error',
-        sequence: rel.sequence,
-        message: `#${rel.sequence}: filterSequence ${rel.filterSequence}가 존재하지 않습니다`,
+        sequence: seq,
+        message: `#${seq}: filterSequence ${rel.filter_sequence}가 존재하지 않습니다`,
       });
     }
-    if (rel.jumpNextSequence != null && !sequenceSet.has(rel.jumpNextSequence)) {
+    if (rel.jump_next_sequence != null && !sequenceSet.has(rel.jump_next_sequence as number)) {
       validationIssues.push({
         severity: 'error',
-        sequence: rel.sequence,
-        message: `#${rel.sequence}: jumpNextSequence ${rel.jumpNextSequence}가 존재하지 않습니다`,
+        sequence: seq,
+        message: `#${seq}: jumpNextSequence ${rel.jump_next_sequence}가 존재하지 않습니다`,
       });
     }
-    // 필수 룰에 쿼리 미정의 경고
-    if (rel.isMandatory === 'Y' && !queryMap.has(rel.ruleId)) {
+    if (rel.is_mandatory === 'Y' && !definedQueryIds.has(rel.rule_id as string)) {
       validationIssues.push({
         severity: 'warning',
-        sequence: rel.sequence,
-        message: `#${rel.sequence} (${rel.ruleId}): 필수 룰인데 쿼리가 정의되지 않았습니다`,
+        sequence: seq,
+        message: `#${seq} (${rel.rule_id}): 필수 룰인데 쿼리가 정의되지 않았습니다`,
       });
     }
   }
 
   const hasErrors = validationIssues.some((i) => i.severity === 'error');
 
-  // ── 5. 시퀀스별 결과 빌드 ───────────────────────────────────
-  const results: SimulationSequenceResult[] = relations.map((rel) => {
-    const seqStart = performance.now();
-    const def = defMap.get(rel.ruleId);
-    const sql = queryMap.get(rel.ruleId);
-    const hasQuery = sql !== undefined;
+  // ── 3. 실 엔진 dry-run 실행 ──────────────────────────────────
+  // 구조적 오류가 없는 경우에만 실행 (오류 있으면 구조 검증 결과만 반환)
+  let results: SimulationSequenceResult[] = [];
 
-    let count: number | null = null;
-    if (hasQuery) {
-      count = countMap.get(rel.ruleId) ?? 0;
+  if (!hasErrors) {
+    const engineResult = await runRuleEngine(supabase, {
+      ruleGroupId,
+      equipmentId: equipId,
+      eventType,
+      dryRun: true,  // rule_running_result 에 기록하지 않음
+    });
+
+    results = engineResult.sequenceResults.map((sr) => ({
+      sequence:     sr.sequence,
+      ruleId:       sr.ruleId,
+      ruleName:     sr.ruleName,
+      ruleType:     sr.ruleType,
+      count:        sr.count,
+      duration:     sr.duration,
+      hasQuery:     sr.queryPreview !== undefined,
+      queryPreview: sr.queryPreview,
+      rows:         sr.rows,
+    }));
+
+    // 엔진이 REJECTED 를 반환한 경우 해당 시퀀스에 경고 추가
+    if (!engineResult.success && engineResult.reason) {
+      validationIssues.push({
+        severity: 'warning',
+        sequence: null,
+        message: engineResult.reason,
+      });
     }
+  } else {
+    // 구조 오류 있을 때는 기존 방식으로 메타만 반환
+    const { data: defRows } = await supabase
+      .from('rule_def')
+      .select('rule_id, rule_name, rule_type')
+      .in('rule_id', ruleIds);
+    const defMap = new Map(
+      (defRows ?? []).map((r) => [r.rule_id as string, { ruleName: r.rule_name as string, ruleType: r.rule_type as string }])
+    );
 
-    return {
-      sequence:    rel.sequence,
-      ruleId:      rel.ruleId,
-      ruleName:    def?.ruleName ?? rel.ruleId,
-      ruleType:    def?.ruleType ?? 'Data',
-      count,
-      duration:    Math.round(performance.now() - seqStart),
-      hasQuery,
-      queryPreview: sql ? sql.slice(0, 100) : undefined,
-    };
-  });
+    results = relations.map((rel) => {
+      const ruleId = rel.rule_id as string;
+      const def = defMap.get(ruleId);
+      return {
+        sequence:  rel.sequence as number,
+        ruleId,
+        ruleName:  def?.ruleName ?? ruleId,
+        ruleType:  def?.ruleType ?? 'Data',
+        count:     null,
+        duration:  0,
+        hasQuery:  definedQueryIds.has(ruleId),
+      };
+    });
+  }
 
   const response: SimulationResponse = {
     valid: !hasErrors,

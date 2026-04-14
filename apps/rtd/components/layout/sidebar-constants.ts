@@ -31,16 +31,11 @@ export const NAV_ITEMS: NavItem[] = [
         href: '/rule-groups',
         icon: FolderTree,
       },
-      {
-        title: '룰 플로우 빌더',
-        href: '/rule-builder/RG001',
-        icon: GitBranch,
-      },
     ],
   },
   {
     title: '시뮬레이터',
-    href: '/simulator/RG001',
+    href: '/simulator',
     icon: FlaskConical,
   },
   {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { X, Plus, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,15 +15,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  TABLE_METADATA,
-  EVENT_METADATA,
-  DUMMY_QUERY_PREVIEWS,
-} from '@/lib/dummy';
 import { useRuleRelations, useUpdateRuleRelation } from '@/lib/api/rule-relations';
 import { useRuleDefs } from '@/lib/api/rule-defs';
 import { useRuleObjects } from '@/lib/api/rule-objects';
+import { useRuleQuery, useUpsertRuleQuery, useDeleteRuleQuery } from '@/lib/api/rule-queries';
 import { RULE_TYPES, MANDATORY_VALUES } from '@workspace/types/constants';
+import {
+  MCS_TABLES,
+  MCS_TABLE_NAMES,
+  MCS_COLUMN_LABELS,
+  MES_EVENT_PARAMS,
+} from '@/lib/rule-engine/mcs-schema-catalog';
 import { SortEditorModal } from '@/components/rule-builder/sort-editor-modal';
 import { ParamEditorModal } from '@/components/rule-builder/param-editor-modal';
 import { QueryBuilderModal } from '@/components/rule-builder/query-builder-modal';
@@ -54,6 +56,48 @@ interface NodeConfigPanelProps {
   onDelete: () => void;
 }
 
+/**
+ * 저장된 SQL을 조건 상태로 파싱 (NodeConfigPanel 이 생성하는 포맷 기준).
+ * SELECT * FROM {table}[ JOIN ...] [WHERE\n  col op val\n  AND col op val]
+ */
+function parseSqlToConditions(sql: string): { tables: string[]; conditions: Condition[] } | null {
+  const fromMatch = sql.match(/FROM\s+(mcs_\w+)/i);
+  if (!fromMatch) return null;
+
+  const mainTable = fromMatch[1];
+  const joinMatches = [...sql.matchAll(/JOIN\s+(mcs_\w+)/gi)].map((m) => m[1]);
+  const tables = [mainTable, ...joinMatches];
+
+  const conditions: Condition[] = [];
+  const whereMatch = sql.match(/WHERE\s*\n([\s\S]+)$/i);
+  if (whereMatch) {
+    const clauses = whereMatch[1].split(/\n\s*AND\s+/i);
+    for (const clause of clauses) {
+      const trimmed = clause.trim().replace(/^\s*AND\s+/i, '');
+      // IS NULL / IS NOT NULL
+      const nullMatch = trimmed.match(/^(\w+)\s+(IS NULL|IS NOT NULL)$/i);
+      if (nullMatch) {
+        conditions.push({ column: nullMatch[1], operator: nullMatch[2].toUpperCase(), valueType: 'direct', value: '' });
+        continue;
+      }
+      // col op value
+      const opMatch = trimmed.match(/^(\w+)\s+(=|!=|>=|<=|>|<|LIKE|IN)\s+(.+)$/i);
+      if (opMatch) {
+        const [, column, operator, rawVal] = opMatch;
+        const trimmedVal = rawVal.trim();
+        if (trimmedVal.startsWith(':')) {
+          conditions.push({ column, operator, valueType: 'eventParam', value: trimmedVal.slice(1) });
+        } else {
+          const value = trimmedVal.replace(/^'(.*)'$/, '$1');
+          conditions.push({ column, operator, valueType: 'direct', value });
+        }
+      }
+    }
+  }
+
+  return { tables, conditions };
+}
+
 /** 노드 설정 사이드 패널 — 룰 유형별 분기 + 파라미터 바인딩 */
 export function NodeConfigPanel({ nodeId, groupId, onClose, onDelete }: NodeConfigPanelProps) {
   // 실데이터 조회 (React Query 캐시 공유 — 네트워크 중복 없음)
@@ -61,16 +105,21 @@ export function NodeConfigPanel({ nodeId, groupId, onClose, onDelete }: NodeConf
   const { data: ruleDefs = [] } = useRuleDefs();
   const { data: ruleObjects = [] } = useRuleObjects(groupId);
   const updateRelation = useUpdateRuleRelation();
+  const upsertQuery = useUpsertRuleQuery();
+  const deleteQuery = useDeleteRuleQuery();
 
   const relation = relations.find((r) => String(r.sequence) === nodeId);
   const ruleDef = ruleDefs.find((d) => d.ruleId === relation?.ruleId);
+
+  // 저장된 쿼리 조회 (rule_query 테이블)
+  const { data: savedQuery } = useRuleQuery(relation?.ruleId);
 
   const [ruleName, setRuleName] = useState(ruleDef?.ruleName ?? '');
   const [ruleType, setRuleType] = useState(ruleDef?.ruleType ?? 'Data');
   const [mandatory, setMandatory] = useState<string>(relation?.isMandatory ?? 'N');
 
   // 테이블 선택 (Data / SubData)
-  const [selectedTables, setSelectedTables] = useState<string[]>(['LOT']);
+  const [selectedTables, setSelectedTables] = useState<string[]>(['mcs_carrier']);
 
   // 조건 행 (Data / Filter / SubData)
   const [conditions, setConditions] = useState<Condition[]>([
@@ -82,6 +131,15 @@ export function NodeConfigPanel({ nodeId, groupId, onClose, onDelete }: NodeConf
     { sortColumn: 'PRIORITY', orderBy: 'DESC', weightValue: '100' },
   ]);
 
+  // 저장된 SQL이 있으면 조건 상태로 복원
+  useEffect(() => {
+    if (!savedQuery?.ruleQueryString) return;
+    const parsed = parseSqlToConditions(savedQuery.ruleQueryString);
+    if (!parsed) return;
+    if (parsed.tables.length > 0) setSelectedTables(parsed.tables);
+    if (parsed.conditions.length > 0) setConditions(parsed.conditions);
+  }, [savedQuery]);
+
   // SQL 펼치기 여부
   const [sqlOpen, setSqlOpen] = useState(false);
 
@@ -90,12 +148,12 @@ export function NodeConfigPanel({ nodeId, groupId, onClose, onDelete }: NodeConf
   const [paramModalOpen, setParamModalOpen] = useState(false);
   const [queryModalOpen, setQueryModalOpen] = useState(false);
 
-  // 현재 룰 그룹에 연결된 이벤트 파라미터 조회
+  // 현재 룰 그룹에 연결된 이벤트 파라미터 조회 (MES 파라미터 바인딩 힌트)
   const eventParams = useMemo(() => {
-    const ruleObj = ruleObjects.find((o) => o.ruleGroupId === groupId);
-    if (!ruleObj) return [];
-    const eventMeta = EVENT_METADATA.find((e) => e.eventId === ruleObj.ruleEventId);
-    return eventMeta?.params ?? [];
+    // ruleObjects 가 있으면 MES 파라미터 힌트 제공
+    const hasBinding = ruleObjects.some((o) => o.ruleGroupId === groupId);
+    if (!hasBinding) return [];
+    return MES_EVENT_PARAMS.map((p) => ({ key: p.replace(':', ''), label: p }));
   }, [groupId, ruleObjects]);
 
   // 현재 시퀀스보다 앞선 룰들 (이전 룰 결과 바인딩용)
@@ -109,21 +167,26 @@ export function NodeConfigPanel({ nodeId, groupId, onClose, onDelete }: NodeConf
       });
   }, [relations, ruleDefs, nodeId]);
 
-  // 선택된 테이블들의 컬럼 목록
+  // 선택된 mcs_* 테이블들의 컬럼 목록
   const availableColumns = useMemo(() => {
-    return TABLE_METADATA.filter((t) => selectedTables.includes(t.id)).flatMap((t) => t.columns);
+    return selectedTables.flatMap((tableName) =>
+      (MCS_TABLES[tableName] ?? []).map((col) => ({
+        name: col,
+        label: MCS_COLUMN_LABELS[tableName]?.[col] ?? col,
+        type: 'string' as const,
+      }))
+    );
   }, [selectedTables]);
 
-  // Filter일 때는 이전 룰 결과 컬럼을 가상으로 제공 (이전 룰의 결과 미리보기 컬럼)
+  // Filter일 때는 mcs_carrier 공통 컬럼 제공 (이전 시퀀스 결과는 carrier 기반)
   const filterColumns = useMemo(() => {
     if (ruleType !== 'Filter') return [];
-    const prevSeq = relation?.filterSequence;
-    if (!prevSeq) return [];
-    const prevRel = relations.find((r) => r.sequence === prevSeq);
-    if (!prevRel) return [];
-    const preview = DUMMY_QUERY_PREVIEWS[prevRel.ruleId];
-    return preview?.columns.map((c) => ({ name: c, label: c, type: 'string' as const })) ?? [];
-  }, [ruleType, relation, relations]);
+    return (MCS_TABLES['mcs_carrier'] ?? []).map((col) => ({
+      name: col,
+      label: MCS_COLUMN_LABELS['mcs_carrier']?.[col] ?? col,
+      type: 'string' as const,
+    }));
+  }, [ruleType]);
 
   const conditionColumns = ruleType === 'Filter' ? filterColumns : availableColumns;
 
@@ -146,10 +209,6 @@ export function NodeConfigPanel({ nodeId, groupId, onClose, onDelete }: NodeConf
     setConditions(conditions.map((c, i) => (i === idx ? { ...c, [field]: val } : c)));
   }
 
-  function getColumnMeta(colName: string) {
-    return conditionColumns.find((c) => c.name === colName);
-  }
-
   // 조건 행의 값 레이블 (미리보기용)
   function getValueLabel(c: Condition): string {
     if (c.valueType === 'eventParam') {
@@ -166,48 +225,76 @@ export function NodeConfigPanel({ nodeId, groupId, onClose, onDelete }: NodeConf
     setSortRows(sortRows.map((r, i) => (i === idx ? { ...r, [field]: val } : r)));
   }
 
-  // 더미 SQL 생성 (개발자용)
+  // SQL 미리보기 생성 (쿼리 빌더에서 저장된 SQL 이 우선 — 이건 시각 참고용)
   const generatedSQL = useMemo(() => {
     if (ruleType === 'Sort') {
       const orderBy = sortRows.map((r) => `${r.sortColumn} ${r.orderBy}`).join(', ');
-      return `-- 이전 룰 결과에 정렬 적용\nORDER BY ${orderBy || 'PRIORITY DESC'}`;
+      return `-- 이전 룰 결과에 정렬 적용\nORDER BY ${orderBy || 'priority ASC'}`;
     }
     if (ruleType === 'Filter') {
+      // Filter 타입: 이전 시퀀스 결과(carrier_id 집합)를 엔진이 IN 절로 자동 주입.
+      // 이 SQL 자체는 mcs_carrier 기반 SELECT 로 작성하면 되고,
+      // 엔진이 filterSequence 체인에서 "WHERE carrier_id IN (...)" 를 감싼다.
       const where = conditions
         .filter((c) => c.column)
-        .map((c) => `  ${c.column} ${c.operator} '${getValueLabel(c)}'`)
+        .map((c) => {
+          const val =
+            c.valueType === 'eventParam' ? `:${c.value}` :
+            c.valueType === 'prevResult' ? `-- @${c.value}` :
+            `'${c.value}'`;
+          return `  ${c.column} ${c.operator} ${val}`;
+        })
         .join('\n  AND ');
-      return `-- 이전 룰 결과에서 필터\nWHERE\n${where || '  (조건 없음)'}`;
+      return `SELECT *\nFROM mcs_carrier${where ? `\nWHERE\n${where}` : ''}`;
     }
-    const mainTable = selectedTables[0] ?? 'LOT';
-    const joins = selectedTables.slice(1).map((tId) => {
-      const t = TABLE_METADATA.find((m) => m.id === tId);
-      const main = TABLE_METADATA.find((m) => m.id === mainTable);
-      return `JOIN DMS_${tId} ON DMS_${mainTable}.${main?.joinKey} = DMS_${tId}.${t?.joinKey}`;
-    });
+    const mainTable = selectedTables[0] ?? 'mcs_carrier';
+    const joins = selectedTables.slice(1).map((tbl) =>
+      `JOIN ${tbl} USING (carrier_id)`
+    );
     const where = conditions
       .filter((c) => c.column)
       .map((c) => {
         const val =
-          c.valueType === 'eventParam' ? `{{${c.value}}}` :
-          c.valueType === 'prevResult' ? `@${c.value}` :
+          c.valueType === 'eventParam' ? `:${c.value}` :
+          c.valueType === 'prevResult' ? `-- @${c.value}` :
           `'${c.value}'`;
         return `  ${c.column} ${c.operator} ${val}`;
       })
       .join('\n  AND ');
-    const fromPart = [`FROM DMS_${mainTable}`, ...joins].join('\n');
+    const fromPart = [`FROM ${mainTable}`, ...joins].join('\n');
     return `SELECT *\n${fromPart}${where ? `\nWHERE\n${where}` : ''}`;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ruleType, selectedTables, conditions, sortRows]);
 
-  const preview = relation?.ruleId ? DUMMY_QUERY_PREVIEWS[relation.ruleId] : undefined;
-
   async function handleSave() {
     if (!relation) return;
+
+    // 1. rule_relation 갱신 (isMandatory)
     await updateRelation.mutateAsync({
       ...relation,
       isMandatory: mandatory,
     });
+
+    // 2. 쿼리 저장/삭제 판단
+    //    - Data/SubData: 테이블이 1개 이상 선택되면 조건 없어도 SELECT * FROM 을 저장
+    //      (조건 없는 Data 는 "전체 조회" 가 정상 동작)
+    //    - Filter: 조건이 있어야만 의미 있음. 엔진이 carrier_id IN (prev) 자동 주입.
+    //    - Sort: 현재 스코프에서는 rule_query 로 저장하지 않음 (rule_sort 별도 경로)
+    const hasConditions = conditions.some((c) => c.column);
+    let shouldSave = false;
+    if (ruleType === 'Data' || ruleType === 'SubData') {
+      shouldSave = selectedTables.length > 0; // 테이블만 선택돼도 저장
+    } else if (ruleType === 'Filter') {
+      shouldSave = hasConditions;
+    }
+
+    if (shouldSave && relation.ruleId) {
+      await upsertQuery.mutateAsync({ ruleId: relation.ruleId, sql: generatedSQL });
+    } else if (!shouldSave && savedQuery?.ruleQueryString && relation.ruleId) {
+      // 저장할 대상이 없는데 DB에 기존 SQL 이 있음 → 삭제
+      await deleteQuery.mutateAsync(relation.ruleId);
+    }
+
     onClose();
   }
 
@@ -258,21 +345,21 @@ export function NodeConfigPanel({ nodeId, groupId, onClose, onDelete }: NodeConf
           </div>
         </section>
 
-        {/* ── Data / SubData: 데이터 대상 테이블 선택 ── */}
+        {/* ── Data / SubData: 데이터 대상 테이블 선택 (실제 mcs_* 테이블) ── */}
         {(ruleType === 'Data' || ruleType === 'SubData') && (
           <section className="space-y-2">
-            <Label className="text-xs font-semibold text-gray-700">데이터 대상</Label>
-            <p className="text-xs text-gray-400">복수 선택 시 자동 JOIN</p>
+            <Label className="text-xs font-semibold text-gray-700">데이터 대상 (MCS 테이블)</Label>
+            <p className="text-xs text-gray-400">복수 선택 시 carrier_id 기준 JOIN</p>
             <div className="space-y-1.5">
-              {TABLE_METADATA.map((t) => (
-                <div key={t.id} className="flex items-center gap-2">
+              {MCS_TABLE_NAMES.map((tName) => (
+                <div key={tName} className="flex items-center gap-2">
                   <Checkbox
-                    id={`table-${t.id}`}
-                    checked={selectedTables.includes(t.id)}
-                    onCheckedChange={() => toggleTable(t.id)}
+                    id={`table-${tName}`}
+                    checked={selectedTables.includes(tName)}
+                    onCheckedChange={() => toggleTable(tName)}
                   />
-                  <label htmlFor={`table-${t.id}`} className="text-sm cursor-pointer select-none">
-                    {t.label}
+                  <label htmlFor={`table-${tName}`} className="text-sm font-mono cursor-pointer select-none">
+                    {tName}
                   </label>
                 </div>
               ))}
@@ -282,8 +369,9 @@ export function NodeConfigPanel({ nodeId, groupId, onClose, onDelete }: NodeConf
 
         {/* ── Filter: 이전 룰 결과 기반 안내 문구 ── */}
         {ruleType === 'Filter' && (
-          <section className="rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-700">
-            이전 룰(#{relation?.filterSequence})의 조회 결과에서 필터링합니다.
+          <section className="rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-700 space-y-1">
+            <p>이전 룰(#{relation?.filterSequence})의 carrier_id 집합을 엔진이 자동으로 IN 절로 주입합니다.</p>
+            <p className="text-blue-500">아래 조건은 <strong>mcs_carrier</strong> 기준 추가 필터입니다.</p>
           </section>
         )}
 
@@ -396,21 +484,15 @@ export function NodeConfigPanel({ nodeId, groupId, onClose, onDelete }: NodeConf
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    {/* 직접 입력: select 타입이면 옵션 목록, 아니면 생략 */}
-                    {(() => {
-                      const meta = getColumnMeta(c.column);
-                      if (meta?.type === 'select' && 'options' in meta && meta.options) {
-                        return (
-                          <SelectGroup>
-                            <SelectLabel className="text-xs">직접 선택</SelectLabel>
-                            {meta.options.map((opt: string) => (
-                              <SelectItem key={opt} value={`direct::${opt}`}>{opt}</SelectItem>
-                            ))}
-                          </SelectGroup>
-                        );
-                      }
-                      return null;
-                    })()}
+                    {/* lot_state 컬럼이면 빠른 선택 목록 제공 */}
+                    {c.column === 'lot_state' && (
+                      <SelectGroup>
+                        <SelectLabel className="text-xs">직접 선택</SelectLabel>
+                        {['WAIT', 'PROCESSING', 'DONE', 'HOLD'].map((opt) => (
+                          <SelectItem key={opt} value={`direct::${opt}`}>{opt}</SelectItem>
+                        ))}
+                      </SelectGroup>
+                    )}
 
                     {/* MES 요청 정보 */}
                     {eventParams.length > 0 && (
@@ -438,8 +520,8 @@ export function NodeConfigPanel({ nodeId, groupId, onClose, onDelete }: NodeConf
                   </SelectContent>
                 </Select>
 
-                {/* 직접 입력 (select 타입이 아닐 때) */}
-                {c.valueType === 'direct' && getColumnMeta(c.column)?.type !== 'select' && (
+                {/* 직접 입력 (lot_state 드롭다운 선택이 아닐 때) */}
+                {c.valueType === 'direct' && c.column !== 'lot_state' && (
                   <Input
                     className="h-7 text-xs"
                     placeholder="직접 입력"
@@ -459,39 +541,11 @@ export function NodeConfigPanel({ nodeId, groupId, onClose, onDelete }: NodeConf
           </section>
         )}
 
-        {/* ── 결과 미리보기 (Sort 제외) ── */}
+        {/* ── 미리보기 안내 — 실제 실행 결과는 시뮬레이터에서 확인 ── */}
         {ruleType !== 'Sort' && (
-          <section className="space-y-2">
-            <Label className="text-xs font-semibold text-gray-700">결과 미리보기</Label>
-            {preview ? (
-              <>
-                <div className="overflow-x-auto rounded border border-gray-100">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="bg-gray-50">
-                        {preview.columns.map((col) => (
-                          <th key={col} className="px-2 py-1.5 text-left font-medium text-gray-600 whitespace-nowrap">
-                            {col}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {preview.rows.map((row, i) => (
-                        <tr key={i} className="border-t border-gray-50">
-                          {row.map((cell, j) => (
-                            <td key={j} className="px-2 py-1.5 text-gray-700 whitespace-nowrap">{cell}</td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <p className="text-xs text-gray-400">{preview.rows.length}건 조회됨 (더미)</p>
-              </>
-            ) : (
-              <p className="text-xs text-gray-400">미리보기 데이터 없음</p>
-            )}
+          <section className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-700">
+            실제 실행 결과는 <strong>시뮬레이터</strong> 탭에서 확인하세요.
+            이 패널의 SQL은 참고용이며, 저장은 아래 &quot;쿼리 편집&quot; 버튼을 사용하세요.
           </section>
         )}
 
@@ -546,9 +600,9 @@ export function NodeConfigPanel({ nodeId, groupId, onClose, onDelete }: NodeConf
           블록 삭제
         </Button>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={onClose} disabled={updateRelation.isPending}>취소</Button>
-          <Button size="sm" onClick={handleSave} disabled={!relation || updateRelation.isPending}>
-            {updateRelation.isPending ? '저장 중...' : '저장'}
+          <Button variant="outline" size="sm" onClick={onClose} disabled={updateRelation.isPending || upsertQuery.isPending || deleteQuery.isPending}>취소</Button>
+          <Button size="sm" onClick={handleSave} disabled={!relation || updateRelation.isPending || upsertQuery.isPending || deleteQuery.isPending}>
+            {(updateRelation.isPending || upsertQuery.isPending || deleteQuery.isPending) ? '저장 중...' : '저장'}
           </Button>
         </div>
       </div>

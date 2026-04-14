@@ -21,11 +21,17 @@ import {
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useRuleQuery, useUpsertRuleQuery } from '@/lib/api/rule-queries';
+import {
+  MCS_TABLES,
+  MCS_TABLE_NAMES,
+  MCS_COLUMN_LABELS,
+  MES_EVENT_PARAMS,
+} from '@/lib/rule-engine/mcs-schema-catalog';
 
-/** 더미 테이블 목록 */
-const TABLES = ['DMS_LOT', 'DMS_EQUIPMENT', 'DMS_CARRIER', 'DMS_ROUTE'];
-/** 더미 연산자 */
-const OPERATORS = ['=', '!=', '>', '<', '>=', '<=', 'LIKE', 'IN'];
+/** 실제 MCS 테이블 목록 (mcs_* 실데이터) */
+const TABLES = MCS_TABLE_NAMES;
+/** SQL WHERE 연산자 */
+const OPERATORS = ['=', '!=', '>', '<', '>=', '<=', 'LIKE', 'IN', 'IS NULL', 'IS NOT NULL'];
 
 interface Condition {
   column: string;
@@ -44,19 +50,31 @@ export function QueryBuilderModal({ open, onClose, ruleId }: QueryBuilderModalPr
   const { data: existingQuery } = useRuleQuery(ruleId);
   const upsertQuery = useUpsertRuleQuery();
 
-  const [table, setTable] = useState('DMS_LOT');
+  const [table, setTable] = useState('mcs_carrier');
+  // 테이블 변경 시 컬럼 목록 갱신
+  const availableColumns = MCS_TABLES[table] ?? [];
+  const columnLabels = MCS_COLUMN_LABELS[table] ?? {};
+
   const [conditions, setConditions] = useState<Condition[]>([
-    { column: 'LOT_STATE', operator: '=', value: 'WAIT' },
+    { column: 'lot_state', operator: '=', value: 'WAIT' },
   ]);
-  const [returnColumns, setReturnColumns] = useState('LOT_ID, PRIORITY, EQP_ID');
+  const [returnColumns, setReturnColumns] = useState('lot_id, priority, current_equipment_id');
 
   /** 기존 SQL이 있으면 SQL 탭에 표시 (파싱 없이 원문 표시) */
   useEffect(() => {
     if (!open) return; // 닫힐 때는 초기화 안 함
   }, [open, existingQuery]);
 
+  // 테이블 변경 시 조건 컬럼을 첫 번째 컬럼으로 초기화
+  function handleTableChange(newTable: string) {
+    setTable(newTable);
+    const cols = MCS_TABLES[newTable] ?? [];
+    setConditions([{ column: cols[0] ?? '', operator: '=', value: '' }]);
+    setReturnColumns(cols.slice(0, 3).join(', '));
+  }
+
   function addCondition() {
-    setConditions([...conditions, { column: '', operator: '=', value: '' }]);
+    setConditions([...conditions, { column: availableColumns[0] ?? '', operator: '=', value: '' }]);
   }
 
   function removeCondition(idx: number) {
@@ -67,12 +85,24 @@ export function QueryBuilderModal({ open, onClose, ruleId }: QueryBuilderModalPr
     setConditions(conditions.map((c, i) => (i === idx ? { ...c, [field]: val } : c)));
   }
 
-  // SQL 자동 생성
+  // SQL 자동 생성 — IS NULL / IS NOT NULL / :파라미터 처리 포함
   const whereClauses = conditions
-    .filter((c) => c.column && c.value)
-    .map((c) => `  ${c.column} ${c.operator} '${c.value}'`)
+    .filter((c) => c.column && (c.operator.includes('NULL') || c.value))
+    .map((c) => {
+      if (c.operator === 'IS NULL' || c.operator === 'IS NOT NULL') {
+        return `  ${c.column} ${c.operator}`;
+      }
+      // :파라미터 바인딩은 그대로 (MES 이벤트 파라미터)
+      if (c.value.startsWith(':')) {
+        return `  ${c.column} ${c.operator} ${c.value}`;
+      }
+      return `  ${c.column} ${c.operator} '${c.value}'`;
+    })
     .join('\n  AND ');
   const generatedSQL = `SELECT ${returnColumns}\nFROM ${table}${whereClauses ? `\nWHERE\n${whereClauses}` : ''}`;
+
+  /** MES 파라미터 바인딩 힌트 — 값 입력란 아래에 표시 */
+  const paramHints = MES_EVENT_PARAMS.join('  ');
 
   async function handleSave() {
     if (!ruleId) return;
@@ -97,8 +127,8 @@ export function QueryBuilderModal({ open, onClose, ruleId }: QueryBuilderModalPr
           <TabsContent value="builder" className="space-y-4 pt-4">
             {/* Step 1: 기준 테이블 */}
             <div className="space-y-1.5">
-              <Label>① 기준 테이블 선택</Label>
-              <Select value={table} onValueChange={(v) => v && setTable(v)}>
+              <Label>① 기준 테이블 선택 (실제 MCS 데이터)</Label>
+              <Select value={table} onValueChange={(v) => v && handleTableChange(v)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -121,17 +151,30 @@ export function QueryBuilderModal({ open, onClose, ruleId }: QueryBuilderModalPr
               </div>
               {conditions.map((c, idx) => (
                 <div key={idx} className="flex items-center gap-2">
-                  <Input
-                    className="flex-1"
-                    placeholder="컬럼명"
+                  {/* 컬럼 드롭다운 — 선택된 테이블의 실제 컬럼만 표시 */}
+                  <Select
                     value={c.column}
-                    onChange={(e) => updateCondition(idx, 'column', e.target.value)}
-                  />
+                    onValueChange={(v) => v && updateCondition(idx, 'column', v)}
+                  >
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="컬럼 선택" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableColumns.map((col) => (
+                        <SelectItem key={col} value={col}>
+                          <span className="font-mono text-xs">{col}</span>
+                          {columnLabels[col] && (
+                            <span className="ml-1.5 text-xs text-muted-foreground">— {columnLabels[col]}</span>
+                          )}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <Select
                     value={c.operator}
                     onValueChange={(v) => v && updateCondition(idx, 'operator', v)}
                   >
-                    <SelectTrigger className="w-24">
+                    <SelectTrigger className="w-32">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -140,12 +183,15 @@ export function QueryBuilderModal({ open, onClose, ruleId }: QueryBuilderModalPr
                       ))}
                     </SelectContent>
                   </Select>
+                  {/* IS NULL / IS NOT NULL 은 값 입력 불필요 */}
+                  {!c.operator.includes('NULL') && (
                   <Input
                     className="flex-1"
-                    placeholder="값"
+                    placeholder="값 또는 :파라미터"
                     value={c.value}
                     onChange={(e) => updateCondition(idx, 'value', e.target.value)}
                   />
+                  )}
                   <Button
                     variant="ghost"
                     size="icon"
@@ -164,8 +210,14 @@ export function QueryBuilderModal({ open, onClose, ruleId }: QueryBuilderModalPr
               <Input
                 value={returnColumns}
                 onChange={(e) => setReturnColumns(e.target.value)}
-                placeholder="LOT_ID, PRIORITY, EQP_ID"
+                placeholder="lot_id, priority, current_equipment_id"
               />
+            </div>
+
+            {/* MES 이벤트 파라미터 힌트 */}
+            <div className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
+              <span className="font-semibold">MES 파라미터 바인딩:</span>{' '}
+              {paramHints}
             </div>
           </TabsContent>
 

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, ArrowRight } from 'lucide-react';
+import { Plus, Pencil, Trash2, ArrowRight, FlaskConical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -191,9 +191,15 @@ export default function RuleGroupsPage() {
                   <p className="text-sm">{currentGroup.ruleGroupType}</p>
                 </div>
                 <Link href={`/rule-builder/${currentGroup.ruleGroupId}`}>
-                  <Button size="sm" className="w-full mt-2">
+                  <Button size="sm" variant="outline" className="w-full mt-2">
                     룰 플로우 빌더 열기
                     <ArrowRight className="h-3.5 w-3.5 ml-1" />
+                  </Button>
+                </Link>
+                <Link href={`/simulator/${currentGroup.ruleGroupId}`}>
+                  <Button size="sm" className="w-full mt-1">
+                    <FlaskConical className="h-3.5 w-3.5 mr-1" />
+                    시뮬레이터 실행
                   </Button>
                 </Link>
               </CardContent>

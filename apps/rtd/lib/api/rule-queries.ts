@@ -34,6 +34,24 @@ export function useRuleQuery(ruleId: string | null | undefined) {
   });
 }
 
+/** SQL 쿼리 삭제 */
+export function useDeleteRuleQuery() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (ruleId: string) => {
+      const supabase = createClient();
+      const { error } = await supabase
+        .from('rule_query')
+        .delete()
+        .eq('rule_query_id', ruleId)
+        .eq('rule_query_version', DEFAULT_VERSION);
+      if (error) throw error;
+    },
+    onSuccess: (_, ruleId) =>
+      qc.refetchQueries({ queryKey: [QUERY_KEY, ruleId] }),
+  });
+}
+
 /** SQL 쿼리 저장 (upsert) */
 export function useUpsertRuleQuery() {
   const qc = useQueryClient();
