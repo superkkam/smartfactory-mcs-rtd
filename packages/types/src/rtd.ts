@@ -152,6 +152,8 @@ export interface SimulationSequenceResult {
   hasQuery: boolean;
   /** SQL 앞 100자 미리보기 (쿼리 존재 시) */
   queryPreview?: string;
+  /** 실제 조회된 rows (최대 10건, dry-run 확인용) */
+  rows?: Record<string, unknown>[];
 }
 
 /** 유효성 검증 결과 단건 */

@@ -2,8 +2,9 @@ import { createServerClient } from '@supabase/ssr';
 import { type NextRequest, NextResponse } from 'next/server';
 
 /**
- * Supabase 세션을 갱신하고 인증 보호 프록시를 처리합니다.
- * Task 012에서 실제 리다이렉트 로직이 활성화됩니다.
+ * Supabase 세션 갱신 유틸리티 (RTD 앱 전용).
+ * MCS 앱은 apps/mcs/proxy.ts 에서 독립적인 인증 미들웨어를 관리한다.
+ * (Next.js 16 proxy 방식과 기존 middleware 방식의 차이로 각 앱이 별도 구현)
  */
 export async function updateSession(request: NextRequest): Promise<Response> {
   let supabaseResponse = NextResponse.next({ request });
@@ -34,14 +35,9 @@ export async function updateSession(request: NextRequest): Promise<Response> {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // TODO: Task 012에서 활성화 — 비로그인 시 /login 리다이렉트
-  // const { pathname } = request.nextUrl;
-  // const isAuthRoute = pathname.startsWith('/login') || pathname.startsWith('/register');
-  // if (!user && !isAuthRoute) {
-  //   const url = request.nextUrl.clone();
-  //   url.pathname = '/login';
-  //   return NextResponse.redirect(url);
-  // }
+  // RTD 앱용: 세션 갱신만 수행, 리다이렉트 로직 없음
+  // MCS 리다이렉트는 apps/mcs/proxy.ts 참고
+  if (!user) { /* 세션 없음 — RTD에서 처리 */ }
 
   return supabaseResponse;
 }
