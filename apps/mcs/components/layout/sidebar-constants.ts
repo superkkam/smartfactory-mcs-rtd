@@ -1,7 +1,9 @@
 import {
   BarChart2,
+  Bot,
   LayoutDashboard,
   Map,
+  Package,
   PlayCircle,
   Settings,
   Truck,
@@ -32,6 +34,16 @@ export const NAV_ITEMS: NavItem[] = [
     title: '반송 제어',
     href: '/transfer-control',
     icon: Truck,
+  },
+  {
+    title: 'ACS',
+    href: '/acs',
+    icon: Bot,
+  },
+  {
+    title: '캐리어 관리',
+    href: '/carrier-admin',
+    icon: Package,
   },
   {
     title: '시뮬레이션',
