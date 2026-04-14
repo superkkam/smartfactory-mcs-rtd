@@ -40,3 +40,17 @@ reference/
 
 # 불필요한 파일
 package.json.bak
+
+# Python 가상환경 / 캐시
+**/.venv/
+**/__pycache__/
+*.pyc
+*.pyo
+
+# AI 학습 체크포인트 (gitkeep 만 유지)
+apps/ai-engine/trained_models/*
+!apps/ai-engine/trained_models/.gitkeep
+
+# 루트 검증용 스크린샷 / 디버그 산출물
+/*.png
+/debug-output.txt
