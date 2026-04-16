@@ -193,7 +193,7 @@ export default function RuleBuilderPage({
               <textarea
                 className="flex-1 resize-none rounded-md border border-indigo-200 bg-white px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-300"
                 rows={3}
-                placeholder={`예시) "웨이퍼 캐리어가 STK-001에 도착하면 우선순위(Priority) 조건을 확인하고, High이면 Process-A로 바로 반송, 아니면 대기 큐에 삽입한다."`}
+                placeholder="디스패칭 조건을 자연어로 입력하세요..."
                 value={llmPrompt}
                 onChange={(e) => setLlmPrompt(e.target.value)}
               />
