@@ -2,7 +2,7 @@
 
 import { use, useState, useCallback, useMemo, useEffect } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Plus, Save } from 'lucide-react';
+import { ArrowLeft, Plus, Save, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
 import {
   ReactFlow,
   Background,
@@ -73,6 +73,10 @@ export default function RuleBuilderPage({
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [newRuleType, setNewRuleType] = useState<string>('Data'); // 블록 추가 유형
   const [newRuleId, setNewRuleId] = useState<string>('');         // 블록 추가 대상 룰
+
+  /** LLM 프롬프트 패널 상태 */
+  const [llmPanelOpen, setLlmPanelOpen] = useState(true);
+  const [llmPrompt, setLlmPrompt] = useState('');
 
   /** 선택된 유형에 맞는 룰 목록 */
   const availableRules = useMemo(
@@ -156,6 +160,69 @@ export default function RuleBuilderPage({
             저장 안내
           </Button>
         </div>
+      </div>
+
+      {/* LLM 프롬프트 패널 */}
+      <div className="rounded-lg border border-indigo-200 bg-indigo-50">
+        {/* 패널 헤더 — 클릭으로 접기/펼치기 */}
+        <button
+          type="button"
+          className="flex w-full items-center justify-between px-4 py-2.5 text-left"
+          onClick={() => setLlmPanelOpen((v) => !v)}
+        >
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-indigo-500" />
+            <span className="text-sm font-semibold text-indigo-700">AI 룰 플로우 자동 생성</span>
+            <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-medium text-indigo-500 border border-indigo-200">
+              개발 예정
+            </span>
+          </div>
+          {llmPanelOpen
+            ? <ChevronUp className="h-4 w-4 text-indigo-400" />
+            : <ChevronDown className="h-4 w-4 text-indigo-400" />
+          }
+        </button>
+
+        {/* 패널 본문 */}
+        {llmPanelOpen && (
+          <div className="border-t border-indigo-200 px-4 pb-4 pt-3 space-y-3">
+            <p className="text-xs text-indigo-600">
+              자연어로 디스패칭 조건을 설명하면 LLM이 룰 플로우 차트를 자동으로 생성합니다.
+            </p>
+            <div className="flex gap-2">
+              <textarea
+                className="flex-1 resize-none rounded-md border border-indigo-200 bg-white px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                rows={3}
+                placeholder={`예시) "웨이퍼 캐리어가 STK-001에 도착하면 우선순위(Priority) 조건을 확인하고, High이면 Process-A로 바로 반송, 아니면 대기 큐에 삽입한다."`}
+                value={llmPrompt}
+                onChange={(e) => setLlmPrompt(e.target.value)}
+              />
+              <div className="flex flex-col gap-2">
+                <Button
+                  size="sm"
+                  className="gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white"
+                  disabled
+                  title="LLM 연동 개발 예정"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  생성
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-gray-400 text-xs"
+                  onClick={() => setLlmPrompt('')}
+                  disabled={!llmPrompt}
+                >
+                  초기화
+                </Button>
+              </div>
+            </div>
+            <p className="text-[11px] text-indigo-400">
+              * GPT-4o / Claude 3.5 Sonnet 연동 예정 — 프롬프트 → 룰 시퀀스 자동 파싱 후 플로우 차트로 렌더링
+            </p>
+          </div>
+        )}
       </div>
 
       {/* 블록 추가 컨트롤 */}
