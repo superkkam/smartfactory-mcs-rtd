@@ -274,9 +274,26 @@ export async function runRuleEngine(
         (jumpCond === 'COUNT=0' && (seqResult.count ?? 0) === 0);
       if (condMet) {
         const jumpIdx = seqIndex.get(jumpSeq);
-        if (jumpIdx !== undefined) nextIdx = jumpIdx;
+        // 후방 점프는 무한 루프 방지를 위해 무시
+        if (jumpIdx !== undefined && jumpIdx > currentIdx) nextIdx = jumpIdx;
       }
     }
+
+    // 점프로 건너뛴 시퀀스를 executed=false 로 기록 (UI 가시성)
+    for (let skipIdx = currentIdx + 1; skipIdx < nextIdx; skipIdx++) {
+      const skipped = relations[skipIdx];
+      const skippedDef = defMap.get(skipped.rule_id as string);
+      seqResults.push({
+        sequence: skipped.sequence as number,
+        ruleId:   skipped.rule_id as string,
+        ruleName: skippedDef?.ruleName ?? (skipped.rule_id as string),
+        ruleType: skippedDef?.ruleType ?? 'Data',
+        count:    null,
+        duration: 0,
+        executed: false,
+      });
+    }
+
     currentIdx = nextIdx;
   }
 

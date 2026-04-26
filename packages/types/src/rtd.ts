@@ -154,6 +154,8 @@ export interface SimulationSequenceResult {
   queryPreview?: string;
   /** 실제 조회된 rows (최대 10건, dry-run 확인용) */
   rows?: Record<string, unknown>[];
+  /** jumpNextSequence로 건너뛴 경우 false */
+  executed?: boolean;
 }
 
 /** 유효성 검증 결과 단건 */

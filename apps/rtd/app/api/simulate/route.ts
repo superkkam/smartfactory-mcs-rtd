@@ -133,12 +133,21 @@ export async function POST(request: NextRequest) {
         message: `#${seq}: filterSequence ${rel.filter_sequence}가 존재하지 않습니다`,
       });
     }
-    if (rel.jump_next_sequence != null && !sequenceSet.has(rel.jump_next_sequence as number)) {
-      validationIssues.push({
-        severity: 'error',
-        sequence: seq,
-        message: `#${seq}: jumpNextSequence ${rel.jump_next_sequence}가 존재하지 않습니다`,
-      });
+    if (rel.jump_next_sequence != null) {
+      const jumpTarget = rel.jump_next_sequence as number;
+      if (!sequenceSet.has(jumpTarget)) {
+        validationIssues.push({
+          severity: 'error',
+          sequence: seq,
+          message: `#${seq}: jumpNextSequence ${jumpTarget}가 존재하지 않습니다`,
+        });
+      } else if (jumpTarget <= seq) {
+        validationIssues.push({
+          severity: 'error',
+          sequence: seq,
+          message: `#${seq}: jumpNextSequence(${jumpTarget})는 자신(${seq})보다 큰 시퀀스를 가리켜야 합니다 — 후방 점프는 무한 루프를 유발합니다`,
+        });
+      }
     }
     if (rel.is_mandatory === 'Y' && !definedQueryIds.has(rel.rule_id as string)) {
       validationIssues.push({
@@ -173,6 +182,7 @@ export async function POST(request: NextRequest) {
       hasQuery:     sr.queryPreview !== undefined,
       queryPreview: sr.queryPreview,
       rows:         sr.rows,
+      executed:     sr.executed,
     }));
 
     // 엔진이 REJECTED 를 반환한 경우 해당 시퀀스에 경고 추가

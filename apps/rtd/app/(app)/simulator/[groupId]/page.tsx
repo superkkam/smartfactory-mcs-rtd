@@ -109,18 +109,20 @@ export default function SimulatorPage({
         const relation = relations.find((r) => r.sequence === seq);
         const isMandatory = relation?.isMandatory === 'Y';
 
+        // executed: res.executed가 명시적으로 false면 건너뛴 시퀀스로 처리
+        const wasExecuted = res ? (res.executed !== false) : false;
         const simState = res
           ? {
-              count:    res.count,
+              count:    wasExecuted ? res.count : null,
               duration: res.duration,
-              executed: true,
-              failed:   isMandatory && res.count === 0,
+              executed: wasExecuted,
+              failed:   wasExecuted && isMandatory && res.count === 0,
               selected: selectedSeq === seq,
             }
           : {
               count:    null,
               duration: 0,
-              executed: false, // 건너뛴 시퀀스 (results 에 없음)
+              executed: false,
               failed:   false,
               selected: false,
             };
