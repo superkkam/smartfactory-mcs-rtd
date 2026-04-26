@@ -31,7 +31,7 @@ import { LlmPromptPanel } from '@/components/rule-builder/llm-prompt-panel';
 import { LlmPreviewModal } from '@/components/rule-builder/llm-preview-modal';
 import { buildGraph } from '@/lib/rule-builder/build-graph';
 import { useRuleGroup } from '@/lib/api/rule-groups';
-import { useRuleRelations, useCreateRuleRelation, useDeleteRuleRelation } from '@/lib/api/rule-relations';
+import { useRuleRelations, useCreateRuleRelation, useDeleteRuleRelation, useUpdateRuleRelation } from '@/lib/api/rule-relations';
 import { useRuleDefs } from '@/lib/api/rule-defs';
 import { RULE_TYPES } from '@workspace/types/constants';
 import type { RuleRelation } from '@workspace/types/rtd';
@@ -57,6 +57,7 @@ export default function RuleBuilderPage({
   const { data: ruleDefs = EMPTY_RULE_DEFS } = useRuleDefs();
   const createRelation = useCreateRuleRelation();
   const deleteRelation = useDeleteRuleRelation();
+  const updateRelation = useUpdateRuleRelation();
 
   /** React Flow 상태 */
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
@@ -81,6 +82,10 @@ export default function RuleBuilderPage({
   const [previewSequences, setPreviewSequences] = useState<GeneratedSequence[]>([]);
   const [previewOpen, setPreviewOpen] = useState(false);
 
+  /** 점프 엣지 연결 다이얼로그 상태 */
+  const [jumpDialog, setJumpDialog] = useState<{ sourceSeq: number; targetSeq: number } | null>(null);
+  const [jumpCondition, setJumpCondition] = useState<'COUNT>0' | 'COUNT=0'>('COUNT>0');
+
   /** 선택된 유형에 맞는 룰 목록 */
   const availableRules = useMemo(
     () => ruleDefs.filter((d) => d.ruleType === newRuleType),
@@ -88,9 +93,51 @@ export default function RuleBuilderPage({
   );
 
   const onConnect = useCallback(
-    (connection: Connection) => setEdges((eds) => addEdge(connection, eds)),
+    (connection: Connection) => {
+      // jump 핸들 연결 → 조건 선택 다이얼로그
+      if (connection.sourceHandle === 'jump-out' && connection.targetHandle === 'jump-in') {
+        const sourceSeq = parseInt(connection.source ?? '', 10);
+        const targetSeq = parseInt(connection.target ?? '', 10);
+        if (!isNaN(sourceSeq) && !isNaN(targetSeq) && targetSeq > sourceSeq) {
+          setJumpDialog({ sourceSeq, targetSeq });
+          setJumpCondition('COUNT>0');
+        }
+        return;
+      }
+      setEdges((eds) => addEdge(connection, eds));
+    },
     [setEdges]
   );
+
+  /** 점프 엣지 삭제 시 DB에서 jumpNextSequence 초기화 */
+  const onEdgesDelete = useCallback(
+    async (deletedEdges: Edge[]) => {
+      for (const edge of deletedEdges) {
+        if (edge.id.startsWith('jump-')) {
+          const sourceSeq = parseInt(edge.source, 10);
+          const rel = relations.find((r) => r.sequence === sourceSeq);
+          if (rel) {
+            await updateRelation.mutateAsync({ ...rel, jumpNextSequence: null, jumpNextSequenceCondition: null });
+          }
+        }
+      }
+    },
+    [relations, updateRelation]
+  );
+
+  /** 점프 조건 확정 저장 */
+  async function handleJumpConfirm() {
+    if (!jumpDialog) return;
+    const rel = relations.find((r) => r.sequence === jumpDialog.sourceSeq);
+    if (rel) {
+      await updateRelation.mutateAsync({
+        ...rel,
+        jumpNextSequence: jumpDialog.targetSeq,
+        jumpNextSequenceCondition: jumpCondition,
+      });
+    }
+    setJumpDialog(null);
+  }
 
   /** 블록 추가 */
   async function addSequenceNode() {
@@ -266,6 +313,7 @@ export default function RuleBuilderPage({
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
+            onEdgesDelete={onEdgesDelete}
             onNodeClick={(_, node) => setSelectedNodeId(node.id)}
             onPaneClick={() => setSelectedNodeId(null)}
             nodeTypes={nodeTypes}
@@ -289,6 +337,34 @@ export default function RuleBuilderPage({
           />
         )}
       </div>
+
+      {/* 점프 조건 설정 다이얼로그 */}
+      {jumpDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-lg p-6 shadow-xl w-80 space-y-4">
+            <h3 className="font-semibold text-sm text-gray-800">점프 조건 설정</h3>
+            <p className="text-xs text-gray-500">
+              #{jumpDialog.sourceSeq} → #{jumpDialog.targetSeq} 점프 발동 조건
+            </p>
+            <Select
+              value={jumpCondition}
+              onValueChange={(v) => v && setJumpCondition(v as 'COUNT>0' | 'COUNT=0')}
+            >
+              <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="COUNT>0">COUNT &gt; 0 — 결과 있을 때 점프</SelectItem>
+                <SelectItem value="COUNT=0">COUNT = 0 — 결과 없을 때 점프</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" size="sm" onClick={() => setJumpDialog(null)}>취소</Button>
+              <Button size="sm" onClick={handleJumpConfirm} disabled={updateRelation.isPending}>
+                {updateRelation.isPending ? '저장 중...' : '저장'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* LLM 생성 결과 미리보기 모달 (fixed overlay) */}
       {previewOpen && (
