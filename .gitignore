@@ -54,3 +54,8 @@ apps/ai-engine/trained_models/*
 # 루트 검증용 스크린샷 / 디버그 산출물
 /*.png
 /debug-output.txt
+
+# Playwright
+apps/mcs/tests/e2e/.auth/
+apps/mcs/playwright-report/
+apps/mcs/test-results/
