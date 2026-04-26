@@ -250,6 +250,18 @@ MCS 플랫폼은 스마트팩토리 연구원 및 현장 엔지니어를 위한 
   - mcs_macro_command 스키마 확장 (rtd_command_id, correlation_id, source_system, algorithm 등)
   - Playwright 자동화 검증 완료 (2026-04-20) — 리포트: `docs/phase4-integration-test-report.md`
 
+
+- ✅ **Task 024: Phase 3~4 누적 브라우저 통합 검증** — 완료 (2026-04-26)
+  - Playwright 인프라: `playwright.config.ts`, `global-setup.ts`(service_role 자동 프로비저닝), `fixtures/seed.ts`
+  - `package.json`: `test:e2e`(node --env-file=.env.local), `type-check` 스크립트 추가
+  - E2E 시나리오 8개 (`tests/e2e/01~08`) — **27 passed / 5 skipped(설계대로) / 0 failed**
+    - T015~018: 반송 제어 A*+AI 추론 섹션 렌더, 시뮬레이션 run→result 폴링 흐름
+    - T019: Waypoint→Node 용어 회귀 (팔레트 "Waypoint" 미노출 확인)
+    - T020: 대시보드 Realtime 연결 배지 + 장비 상태 오버레이
+    - T021: ACS /acs 페이지 Start 버튼, React Flow 캔버스 렌더
+    - T022: RTD 비활성 배지/버튼, 혼잡도 토글 ON/OFF, A* vs AI 비교 카드
+  - Task 023 (배포·CI): 추후 진행 예정 (보류)
+
 - **Task 023: 성능 최적화 + Vercel 배포 + CI/CD 구성**
   - Next.js 번들 크기 분석 및 최적화 (React Flow 지연 로딩, SVG 심볼 코드 스플리팅)
   - TanStack Query 캐싱 전략 최적화 (레이아웃 데이터 staleTime 설정)
@@ -267,5 +279,5 @@ MCS 플랫폼은 스마트팩토리 연구원 및 현장 엔지니어를 위한 
 | Phase 1: 애플리케이션 골격 구축 | ✅ 완료 | 3 | 3/3 |
 | Phase 2: UI/UX 완성 (더미 데이터) | ✅ 완료 | 7 | 7/7 |
 | Phase 3: 핵심 기능 구현 | ✅ 완료 | 9 | 9/9 |
-| Phase 4: 실시간 모니터링 + 배포 | 진행 중 | 4 | 3/4 |
-| **합계** | | **23** | **22/23** |
+| Phase 4: 실시간 모니터링 + 배포 | 진행 중 | 5 | 4/5 |
+| **합계** | | **24** | **23/24** |
