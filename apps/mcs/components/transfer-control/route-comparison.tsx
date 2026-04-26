@@ -3,6 +3,7 @@
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { AstarRouteTable, type AstarPathStep } from './astar-route-table';
 import { AiRouteView, type AiRouteStep }       from './ai-route-view';
+import { Badge } from '@/components/ui/badge';
 
 interface RouteComparisonProps {
   astarPath:       AstarPathStep[];
@@ -25,6 +26,11 @@ export function RouteComparison({
   // 비교 요약: A* 총 비용(m) → 예상 시간 (0.3 m/s 기준)
   const astarEstimateSec = (astarTotalCost / 0.3).toFixed(1);
   const aiEstimateSec    = ((aiTotalTimeMs ?? 0) / 1000).toFixed(1);
+
+  // 경로 동일 여부 판단 (unitLabel 기준)
+  const astarLabels = astarPath.map((s) => s.unitLabel).join(',');
+  const aiLabels    = (aiPath ?? []).map((s) => s.unitLabel).join(',');
+  const isDifferent = aiPath && aiPath.length > 0 && astarLabels !== aiLabels;
 
   return (
     <Tabs defaultValue="astar">
@@ -69,6 +75,17 @@ export function RouteComparison({
             />
           </div>
         </div>
+
+        {/* 경로 차이 배너 */}
+        {isDifferent && (
+          <div className="mt-3 flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+            <span className="font-semibold">경로 차이 감지!</span>
+            <span>A*는 정적 최단 경로, AI는 혼잡 회피 경로를 선택했습니다.</span>
+            <Badge className="ml-auto bg-emerald-100 text-emerald-700 border-emerald-300 text-[10px]">
+              A* {astarPath.length}홉 vs AI {aiPath!.length}홉
+            </Badge>
+          </div>
+        )}
 
         {/* 요약 비교 */}
         <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4">

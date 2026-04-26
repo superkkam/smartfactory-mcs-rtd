@@ -9,6 +9,7 @@ import { RtdStatusBadge }    from '@/components/transfer-control/rtd-status-badg
 import { RouteSearchForm }   from '@/components/transfer-control/route-search-form';
 import { MacroCommandCard }  from '@/components/transfer-control/macro-command-card';
 import { RouteComparison }   from '@/components/transfer-control/route-comparison';
+import { CongestionToggle }  from '@/components/transfer-control/congestion-toggle';
 import { useLayouts }        from '@/lib/api/layouts';
 import { inferRoute }        from '@/lib/api/ai-engine';
 import type { AstarPathStep } from '@/components/transfer-control/astar-route-table';
@@ -31,13 +32,23 @@ export default function TransferControlPage() {
   const [isSearching,  setIsSearching]  = useState(false);
   const [isAiLoading,  setIsAiLoading]  = useState(false);
   const [isSyncing,    setIsSyncing]    = useState(false);
+  const [isExecuting,  setIsExecuting]  = useState(false);
   const [astarResult,  setAstarResult]  = useState<AstarResponse | null>(null);
   const [aiResult,     setAiResult]     = useState<InferenceResponse | null>(null);
   const [sourceLabel,  setSourceLabel]  = useState('');
   const [destLabel,    setDestLabel]    = useState('');
+  /** 경로 탐색 시 사용한 DB UUID (명령 실행 시 재사용) */
+  const [fromUnitId,   setFromUnitId]   = useState('');
+  const [toUnitId,     setToUnitId]     = useState('');
   const [relationsMissing, setRelationsMissing] = useState(false);
+  /** 혼잡도 맵: { unitLabel: congestionFactor } — CongestionToggle에서 주입 */
+  const [congestionWeights, setCongestionWeights] = useState<Record<string, number> | null>(null);
 
-  const handleSearch = async (fromUnitId: string, toUnitId: string) => {
+  const handleSearch = async (from: string, to: string) => {
+    setFromUnitId(from);
+    setToUnitId(to);
+    const fromUnitId = from;
+    const toUnitId   = to;
     if (!layoutId) {
       toast.error('레이아웃이 없습니다. 레이아웃 모델러에서 먼저 저장해주세요.');
       return;
@@ -57,7 +68,12 @@ export default function TransferControlPage() {
         if (!r.ok || data.error) throw new Error(data.error ?? '경로 탐색 실패');
         return data;
       }),
-      inferRoute({ layoutId, sourceUnitId: fromUnitId, destUnitId: toUnitId }),
+      inferRoute({
+        layoutId,
+        sourceUnitId:   fromUnitId,
+        destUnitId:     toUnitId,
+        dynamicWeights: congestionWeights ?? undefined,
+      }),
     ]);
 
     if (astarRes.status === 'fulfilled') {
@@ -111,9 +127,40 @@ export default function TransferControlPage() {
     }
   };
 
-  const handleExecute = () => {
-    if (!astarResult) return;
-    toast.success('반송 명령 전송 완료 (실제 실행은 Phase 4에서 연동 예정)');
+  const handleExecute = async () => {
+    if (!astarResult || !layoutId || !fromUnitId || !toUnitId) {
+      toast.error('경로를 먼저 탐색하세요.');
+      return;
+    }
+    setIsExecuting(true);
+    try {
+      const aiTotalCost = aiResult?.totalCost;
+      const algorithm =
+        !aiResult?.fallback &&
+        aiTotalCost !== undefined &&
+        aiTotalCost < astarResult.totalCost
+          ? 'AI_PPO'
+          : 'ASTAR';
+
+      const res = await fetch('/api/commands/create', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          layoutId,
+          sourceUnitId: fromUnitId,
+          destUnitId:   toUnitId,
+          path:         astarResult.path.map((s) => s.unitId),
+          algorithm,
+        }),
+      });
+      const data = await res.json() as { ok?: boolean; commandId?: string; algorithm?: string; error?: string };
+      if (!res.ok) throw new Error(data.error ?? '명령 생성 실패');
+      toast.success(`반송 명령 생성 완료 [${data.algorithm}] — ${data.commandId}`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '명령 생성 실패');
+    } finally {
+      setIsExecuting(false);
+    }
   };
 
   return (
@@ -131,7 +178,7 @@ export default function TransferControlPage() {
             )}
           </p>
         </div>
-        <RtdStatusBadge />
+        <RtdStatusBadge sourceEquipmentLabel={sourceLabel || undefined} />
       </div>
 
       {/* 전이 관계 누락 오류 배너 */}
@@ -153,6 +200,9 @@ export default function TransferControlPage() {
           </Button>
         </div>
       )}
+
+      {/* 혼잡도 시뮬레이션 토글 */}
+      <CongestionToggle onChange={setCongestionWeights} />
 
       {/* 경로 탐색 폼 */}
       <Card>
@@ -199,9 +249,9 @@ export default function TransferControlPage() {
 
           {/* 명령 실행 */}
           <div className="flex justify-end">
-            <Button onClick={handleExecute} className="gap-2">
-              <SendHorizonal className="h-4 w-4" />
-              반송 명령 실행
+            <Button onClick={handleExecute} disabled={isExecuting} className="gap-2">
+              <SendHorizonal className={`h-4 w-4 ${isExecuting ? 'animate-spin' : ''}`} />
+              {isExecuting ? '생성 중...' : '반송 명령 실행'}
             </Button>
           </div>
         </>
