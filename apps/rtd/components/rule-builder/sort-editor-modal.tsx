@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Dialog,
   DialogContent,
@@ -26,7 +25,6 @@ import type { RuleRelation } from '@workspace/types/rtd';
 interface SortRow {
   sortColumn: string;
   orderBy: string;
-  weightValue: string;
   fromPercent: string;
   toPercent: string;
 }
@@ -46,7 +44,7 @@ export function SortEditorModal({ open, onClose, relation }: SortEditorModalProp
   const updateRelation = useUpdateRuleRelation();
 
   const [rows, setRows] = useState<SortRow[]>([
-    { sortColumn: 'PRIORITY', orderBy: 'DESC', weightValue: '100', fromPercent: '0', toPercent: '100' },
+    { sortColumn: 'PRIORITY', orderBy: 'DESC', fromPercent: '0', toPercent: '100' },
   ]);
 
   /** 기존 데이터 로드 */
@@ -55,7 +53,6 @@ export function SortEditorModal({ open, onClose, relation }: SortEditorModalProp
       setRows([{
         sortColumn:  existingSort.sortColumn,
         orderBy:     existingSort.orderBy,
-        weightValue: String(existingSort.weightValue ?? ''),
         fromPercent: String(existingSort.fromPercent ?? ''),
         toPercent:   String(existingSort.toPercent ?? ''),
       }]);
@@ -63,7 +60,7 @@ export function SortEditorModal({ open, onClose, relation }: SortEditorModalProp
   }, [existingSort]);
 
   function addRow() {
-    setRows([...rows, { sortColumn: '', orderBy: 'ASC', weightValue: '', fromPercent: '', toPercent: '' }]);
+    setRows([...rows, { sortColumn: '', orderBy: 'ASC', fromPercent: '', toPercent: '' }]);
   }
 
   function removeRow(idx: number) {
@@ -85,7 +82,6 @@ export function SortEditorModal({ open, onClose, relation }: SortEditorModalProp
       ruleSortId:   newSortId,
       sortColumn:   firstRow.sortColumn,
       orderBy:      firstRow.orderBy,
-      weightValue:  firstRow.weightValue ? Number(firstRow.weightValue) : undefined,
       fromPercent:  firstRow.fromPercent ? Number(firstRow.fromPercent) : undefined,
       toPercent:    firstRow.toPercent ? Number(firstRow.toPercent) : undefined,
     });
@@ -110,17 +106,16 @@ export function SortEditorModal({ open, onClose, relation }: SortEditorModalProp
         <div className="space-y-3 py-2">
           <p className="text-xs text-gray-400">※ 첫 번째 조건이 저장됩니다 (연구 프로토타입)</p>
           {/* 헤더 */}
-          <div className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_auto] gap-2 text-xs font-medium text-gray-500 px-1">
+          <div className="grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-2 text-xs font-medium text-gray-500 px-1">
             <span>정렬 컬럼</span>
             <span>방향</span>
-            <span>가중치</span>
             <span>시작(%)</span>
             <span>끝(%)</span>
             <span />
           </div>
 
           {rows.map((row, idx) => (
-            <div key={idx} className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_auto] gap-2 items-center">
+            <div key={idx} className="grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-2 items-center">
               <Input
                 placeholder="PRIORITY"
                 value={row.sortColumn}
@@ -135,12 +130,6 @@ export function SortEditorModal({ open, onClose, relation }: SortEditorModalProp
                   <SelectItem value="DESC">DESC</SelectItem>
                 </SelectContent>
               </Select>
-              <Input
-                type="number"
-                placeholder="100"
-                value={row.weightValue}
-                onChange={(e) => updateRow(idx, 'weightValue', e.target.value)}
-              />
               <Input
                 type="number"
                 placeholder="0"

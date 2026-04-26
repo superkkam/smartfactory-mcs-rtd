@@ -46,7 +46,6 @@ interface Condition {
 interface SortRow {
   sortColumn: string;
   orderBy: 'ASC' | 'DESC';
-  weightValue: string;
 }
 
 interface NodeConfigPanelProps {
@@ -135,7 +134,7 @@ export function NodeConfigPanel({ nodeId, groupId, onClose, onDelete }: NodeConf
 
   // 정렬 행 (Sort)
   const [sortRows, setSortRows] = useState<SortRow[]>([
-    { sortColumn: 'PRIORITY', orderBy: 'DESC', weightValue: '100' },
+    { sortColumn: 'PRIORITY', orderBy: 'DESC' },
   ]);
 
   // 저장된 SQL이 있으면 조건 상태로 복원
@@ -436,17 +435,17 @@ export function NodeConfigPanel({ nodeId, groupId, onClose, onDelete }: NodeConf
               <Label className="text-xs font-semibold text-gray-700">정렬 조건</Label>
               <Button
                 variant="ghost" size="sm" className="h-6 text-xs px-2"
-                onClick={() => setSortRows([...sortRows, { sortColumn: '', orderBy: 'ASC', weightValue: '' }])}
+                onClick={() => setSortRows([...sortRows, { sortColumn: '', orderBy: 'ASC' }])}
               >
                 <Plus className="h-3 w-3 mr-0.5" />추가
               </Button>
             </div>
             {/* 헤더 */}
-            <div className="grid grid-cols-[2fr_1fr_1fr_auto] gap-1 text-xs text-gray-400 px-0.5">
-              <span>컬럼</span><span>방향</span><span>가중치</span><span />
+            <div className="grid grid-cols-[2fr_1fr_auto] gap-1 text-xs text-gray-400 px-0.5">
+              <span>컬럼</span><span>방향</span><span />
             </div>
             {sortRows.map((row, idx) => (
-              <div key={idx} className="grid grid-cols-[2fr_1fr_1fr_auto] gap-1 items-center">
+              <div key={idx} className="grid grid-cols-[2fr_1fr_auto] gap-1 items-center">
                 <Input
                   className="h-7 text-xs" placeholder="PRIORITY"
                   value={row.sortColumn}
@@ -459,11 +458,6 @@ export function NodeConfigPanel({ nodeId, groupId, onClose, onDelete }: NodeConf
                     <SelectItem value="DESC">DESC</SelectItem>
                   </SelectContent>
                 </Select>
-                <Input
-                  className="h-7 text-xs" type="number" placeholder="100"
-                  value={row.weightValue}
-                  onChange={(e) => updateSortRow(idx, 'weightValue', e.target.value)}
-                />
                 <button className="text-red-400 hover:text-red-600 p-0.5" onClick={() => setSortRows(sortRows.filter((_, i) => i !== idx))}>
                   <Trash2 className="h-3 w-3" />
                 </button>
