@@ -158,10 +158,17 @@ export async function runRuleEngine(
     return makeError(ruleGroupId, 'filterSequence 순환 참조 감지됨', performance.now() - totalStart);
   }
 
-  // ── 2. rule_def / rule_query 병렬 조회 ──────────────────────
-  const [defResult, queryResult] = await Promise.all([
+  // ── 2. rule_def / rule_query / rule_sort 병렬 조회 ─────────
+  const sortIds = relations
+    .map((r) => r.rule_sort_id as string | null)
+    .filter((id): id is string => !!id);
+
+  const [defResult, queryResult, sortResult] = await Promise.all([
     supabase.from('rule_def').select('rule_id, rule_name, rule_type').in('rule_id', ruleIds),
     supabase.from('rule_query').select('rule_query_id, rule_query_string').in('rule_query_id', ruleIds),
+    sortIds.length > 0
+      ? supabase.from('rule_sort').select('rule_sort_id, sort_column, order_by').in('rule_sort_id', sortIds)
+      : { data: null, error: null },
   ]);
 
   const defMap = new Map<string, { ruleName: string; ruleType: string }>();
@@ -172,6 +179,14 @@ export async function runRuleEngine(
   const queryMap = new Map<string, string>();
   for (const row of queryResult.data ?? []) {
     queryMap.set(row.rule_query_id as string, row.rule_query_string as string);
+  }
+
+  const sortMap = new Map<string, { sortColumn: string; orderBy: string }>();
+  for (const row of (sortResult.data ?? []) as Array<Record<string, unknown>>) {
+    sortMap.set(row.rule_sort_id as string, {
+      sortColumn: row.sort_column as string,
+      orderBy:    (row.order_by as string).toUpperCase(),
+    });
   }
 
   // ── 3. 시퀀스별 실행 ─────────────────────────────────────────
@@ -209,7 +224,41 @@ export async function runRuleEngine(
       executed:     true,
     };
 
-    if (sql) {
+    const sortId = rel.rule_sort_id as string | null;
+
+    if (def?.ruleType === 'Sort' || sortId != null) {
+      // ── Sort 룰: rule_sort 기준 인메모리 정렬 ────────────────
+      const sortDef = sortId ? sortMap.get(sortId) : undefined;
+      // 정렬 입력: filterSeq 참조가 있으면 해당 시퀀스 결과, 없으면 최근 finalRows
+      const inputRows = (filterSeq != null ? prevResults.get(filterSeq) : undefined) ?? finalRows;
+
+      if (sortDef && inputRows.length > 0) {
+        const col = sortDef.sortColumn.toLowerCase();
+        const dir = sortDef.orderBy === 'DESC' ? -1 : 1;
+        const sorted = [...inputRows].sort((a, b) => {
+          const av = a[col] ?? a[sortDef.sortColumn];
+          const bv = b[col] ?? b[sortDef.sortColumn];
+          if (av == null && bv == null) return 0;
+          if (av == null) return dir;          // null은 뒤로
+          if (bv == null) return -dir;
+          if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * dir;
+          return String(av).localeCompare(String(bv)) * dir;
+        });
+        seqResult.count = sorted.length;
+        seqResult.rows  = sorted.slice(0, 100);
+        prevResults.set(seq, sorted);
+        if (sorted.length > 0) finalRows = sorted;
+      } else {
+        // 정렬 조건 미정의 또는 입력 데이터 없음 → 이전 결과 그대로 패스스루
+        seqResult.count = inputRows.length;
+        seqResult.rows  = inputRows.slice(0, 100);
+        prevResults.set(seq, inputRows);
+      }
+      seqResult.queryPreview = sortDef
+        ? `ORDER BY ${sortDef.sortColumn} ${sortDef.orderBy}`
+        : undefined;
+
+    } else if (sql) {
       seqResult.queryPreview = sql.slice(0, 100);
 
       // filterSequence 체인: 이전 시퀀스 결과를 WITH CTE 로 주입

@@ -149,7 +149,9 @@ export async function POST(request: NextRequest) {
         });
       }
     }
-    if (rel.is_mandatory === 'Y' && !definedQueryIds.has(rel.rule_id as string)) {
+    // Sort 룰은 rule_query 대신 rule_sort_id 로 동작하므로 쿼리 미정의 경고 제외
+    const isSort = rel.rule_sort_id != null;
+    if (rel.is_mandatory === 'Y' && !definedQueryIds.has(rel.rule_id as string) && !isSort) {
       validationIssues.push({
         severity: 'warning',
         sequence: seq,
