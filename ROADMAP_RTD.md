@@ -219,13 +219,15 @@ RTD 노코드 룰 빌더 플랫폼은 스마트팩토리 현장 엔지니어를 
 > 전체 구현이 아닌 few-shot 기반 샘플 시나리오 수준으로 구현.
 > 참고 연구: Xia et al., IEEE ETFA 2025 Best Paper (자연어 기반 산업 자동화 제어)
 
-- **Task 023: LLM 자연어 → 룰 플로우 변환 프로토타입**
-  - 자연어 입력 UI: 룰 플로우 빌더 페이지 내 "자연어로 룰 생성" 입력 패널
-  - 프롬프트 엔지니어링: 자연어 → RuleRelation 시퀀스 JSON 변환 프롬프트 설계
-  - 샘플 시나리오 few-shot 예시 3~5개 구성
-    (예: "긴급 Lot을 우선 디스패칭하고, 설비 상태가 IDLE인 것만 필터" → 룰 시퀀스 자동 생성)
-  - LLM 응답(JSON) → React Flow 노드/엣지 자동 렌더링
-  - 생성된 룰 플로우를 사용자가 수정 가능하도록 기존 빌더와 통합
+- **Task 023: LLM 자연어 → 룰 플로우 변환 프로토타입** 🚧 (구현 완료, E2E 검증 대기)
+  - ✅ 자연어 입력 UI: `LlmPromptPanel` 컴포넌트 분리 (`components/rule-builder/llm-prompt-panel.tsx`)
+  - ✅ `@anthropic-ai/sdk` Claude 3.5 Sonnet Tool Use 연동 (`app/api/llm/generate-rules/route.ts`)
+  - ✅ Zod 스키마 + 불변성 검증(순환 참조, ruleId 유효성) + 1회 자동 재시도 (`lib/llm/rule-schema.ts`)
+  - ✅ few-shot 예시 3개 (긴급Lot우선 / 동일레시피 부하분산 / Idle+heartbeat 이중조건) (`lib/llm/few-shot-examples.ts`)
+  - ✅ 시스템 프롬프트 + 런타임 RuleDef 컨텍스트 주입 (`lib/llm/prompt-builder.ts`)
+  - ✅ 미리보기 모달 (시퀀스 카드 + reasoning 표시 + 교체/이어붙이기 선택) (`components/rule-builder/llm-preview-modal.tsx`)
+  - ✅ 생성된 룰 플로우 일괄 저장 → 기존 React Flow 캔버스 자동 렌더링
+  - ⬜ `ANTHROPIC_API_KEY` 설정 후 Playwright MCP E2E 테스트
 
 - **Task 024: LLM 룰 생성 결과 검증 및 논문 실험 데이터 수집**
   - 자연어 입력 → 생성된 룰 vs 수동 작성 룰 비교 실험
@@ -242,7 +244,7 @@ RTD 노코드 룰 빌더 플랫폼은 스마트팩토리 현장 엔지니어를 
 | Phase 2: UI/UX 완성 (더미 데이터) | ✅ 완료 | 8 | 8/8 |
 | Phase 3: 핵심 기능 구현 | ✅ 완료 | 7 | 7/7 |
 | Phase 4: 실시간 모니터링 + 배포 | 진행 중 | 4 | 3/4 |
-| Phase 5: LLM 자연어 룰 생성 (프로토타입) | 대기 | 2 | 0/2 |
+| Phase 5: LLM 자연어 룰 생성 (프로토타입) | 진행 중 | 2 | 0/2 |
 | **합계** | | **24** | **21/24** |
 
 ---

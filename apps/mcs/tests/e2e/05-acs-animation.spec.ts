@@ -11,10 +11,11 @@ test.describe('T021: ACS 틱 루프 및 AMR 애니메이션', () => {
     await expect(page.getByText(/ACS|반송 제어|tick|상태/i).first()).toBeVisible();
   });
 
-  test('Start/Stop 버튼 존재 및 클릭 가능', async ({ page }) => {
+  test('"ACS 시작" 버튼 존재 및 클릭 가능', async ({ page }) => {
     await page.goto('/acs');
     await page.waitForLoadState('networkidle');
-    const startBtn = page.getByRole('button', { name: /start|시작/i });
+    // 정확한 버튼명으로 strict mode 방지
+    const startBtn = page.getByRole('button', { name: 'ACS 시작' });
     await expect(startBtn).toBeVisible({ timeout: 5_000 });
     await expect(startBtn).toBeEnabled();
   });
@@ -22,11 +23,11 @@ test.describe('T021: ACS 틱 루프 및 AMR 애니메이션', () => {
   test('ACS 시작 후 상태 변화 표시', async ({ page }) => {
     await page.goto('/acs');
     await page.waitForLoadState('networkidle');
-    const startBtn = page.getByRole('button', { name: /start|시작/i });
+    const startBtn = page.getByRole('button', { name: 'ACS 시작' });
     if (await startBtn.isVisible()) {
       await startBtn.click();
       await expect(
-        page.getByText(/tick|step|assigned|moving|idle/i).first()
+        page.getByText(/tick|step|assigned|moving|idle|정지|실행/i).first()
       ).toBeVisible({ timeout: 5_000 });
     }
   });

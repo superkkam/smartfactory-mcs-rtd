@@ -2,7 +2,7 @@
 
 import { use, useState, useCallback, useMemo, useEffect } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Plus, Save, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowLeft, Plus, Save } from 'lucide-react';
 import {
   ReactFlow,
   Background,
@@ -27,6 +27,8 @@ import {
 } from '@/components/ui/select';
 import { SequenceNode } from '@/components/rule-builder/sequence-node';
 import { NodeConfigPanel } from '@/components/rule-builder/node-config-panel';
+import { LlmPromptPanel } from '@/components/rule-builder/llm-prompt-panel';
+import { LlmPreviewModal } from '@/components/rule-builder/llm-preview-modal';
 import { buildGraph } from '@/lib/rule-builder/build-graph';
 import { useRuleGroup } from '@/lib/api/rule-groups';
 import { useRuleRelations, useCreateRuleRelation, useDeleteRuleRelation } from '@/lib/api/rule-relations';
@@ -34,6 +36,7 @@ import { useRuleDefs } from '@/lib/api/rule-defs';
 import { RULE_TYPES } from '@workspace/types/constants';
 import type { RuleRelation } from '@workspace/types/rtd';
 import type { RuleDef } from '@workspace/types/rtd';
+import type { GeneratedSequence } from '@/lib/llm/rule-schema';
 
 const nodeTypes = { sequence: SequenceNode };
 
@@ -74,9 +77,9 @@ export default function RuleBuilderPage({
   const [newRuleType, setNewRuleType] = useState<string>('Data'); // 블록 추가 유형
   const [newRuleId, setNewRuleId] = useState<string>('');         // 블록 추가 대상 룰
 
-  /** LLM 프롬프트 패널 상태 */
-  const [llmPanelOpen, setLlmPanelOpen] = useState(true);
-  const [llmPrompt, setLlmPrompt] = useState('');
+  /** LLM 미리보기 모달 상태 */
+  const [previewSequences, setPreviewSequences] = useState<GeneratedSequence[]>([]);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   /** 선택된 유형에 맞는 룰 목록 */
   const availableRules = useMemo(
@@ -110,6 +113,36 @@ export default function RuleBuilderPage({
       ruleSortId: null,
     });
     setNewRuleId('');
+  }
+
+  /** LLM 생성 시퀀스 일괄 적용 */
+  async function handleApplyGenerated(sequences: GeneratedSequence[], append: boolean) {
+    setPreviewOpen(false);
+
+    // 교체 모드: 기존 시퀀스 전부 삭제
+    if (!append && relations.length > 0) {
+      await Promise.all(
+        relations.map((r) =>
+          deleteRelation.mutateAsync({ ruleGroupId: r.ruleGroupId, ruleId: r.ruleId, sequence: r.sequence })
+        )
+      );
+    }
+
+    // 이어붙이기 모드: 기존 마지막 sequence 이후부터 번호 조정
+    const offset = append ? Math.max(0, ...relations.map((r) => r.sequence)) : 0;
+
+    for (const s of sequences) {
+      await createRelation.mutateAsync({
+        ruleGroupId: groupId,
+        ruleId: s.ruleId,
+        sequence: s.sequence + offset,
+        isMandatory: s.isMandatory,
+        filterSequence: s.filterSequence ? s.filterSequence + offset : null,
+        jumpNextSequence: s.jumpNextSequence ? s.jumpNextSequence + offset : null,
+        jumpNextSequenceCondition: s.jumpNextSequenceCondition ?? null,
+        ruleSortId: null,
+      });
+    }
   }
 
   /** 블록 삭제 (사이드패널에서 호출) */
@@ -163,67 +196,10 @@ export default function RuleBuilderPage({
       </div>
 
       {/* LLM 프롬프트 패널 */}
-      <div className="rounded-lg border border-indigo-200 bg-indigo-50">
-        {/* 패널 헤더 — 클릭으로 접기/펼치기 */}
-        <button
-          type="button"
-          className="flex w-full items-center justify-between px-4 py-2.5 text-left"
-          onClick={() => setLlmPanelOpen((v) => !v)}
-        >
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-indigo-500" />
-            <span className="text-sm font-semibold text-indigo-700">AI 룰 플로우 자동 생성</span>
-            <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-medium text-indigo-500 border border-indigo-200">
-              개발 예정
-            </span>
-          </div>
-          {llmPanelOpen
-            ? <ChevronUp className="h-4 w-4 text-indigo-400" />
-            : <ChevronDown className="h-4 w-4 text-indigo-400" />
-          }
-        </button>
-
-        {/* 패널 본문 */}
-        {llmPanelOpen && (
-          <div className="border-t border-indigo-200 px-4 pb-4 pt-3 space-y-3">
-            <p className="text-xs text-indigo-600">
-              자연어로 디스패칭 조건을 설명하면 LLM이 룰 플로우 차트를 자동으로 생성합니다.
-            </p>
-            <div className="flex gap-2">
-              <textarea
-                className="flex-1 resize-none rounded-md border border-indigo-200 bg-white px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                rows={3}
-                placeholder="디스패칭 조건을 자연어로 입력하세요..."
-                value={llmPrompt}
-                onChange={(e) => setLlmPrompt(e.target.value)}
-              />
-              <div className="flex flex-col gap-2">
-                <Button
-                  size="sm"
-                  className="gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white"
-                  disabled
-                  title="LLM 연동 개발 예정"
-                >
-                  <Sparkles className="h-3.5 w-3.5" />
-                  생성
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="text-gray-400 text-xs"
-                  onClick={() => setLlmPrompt('')}
-                  disabled={!llmPrompt}
-                >
-                  초기화
-                </Button>
-              </div>
-            </div>
-            <p className="text-[11px] text-indigo-400">
-              * GPT-4o / Claude 3.5 Sonnet 연동 예정 — 프롬프트 → 룰 시퀀스 자동 파싱 후 플로우 차트로 렌더링
-            </p>
-          </div>
-        )}
-      </div>
+      <LlmPromptPanel
+        ruleGroupId={groupId}
+        onGenerated={(seqs) => { setPreviewSequences(seqs); setPreviewOpen(true); }}
+      />
 
       {/* 블록 추가 컨트롤 */}
       <div className="flex items-center gap-2">
@@ -314,6 +290,16 @@ export default function RuleBuilderPage({
         )}
       </div>
 
+      {/* LLM 생성 결과 미리보기 모달 (fixed overlay) */}
+      {previewOpen && (
+        <LlmPreviewModal
+          sequences={previewSequences}
+          ruleDefs={ruleDefs}
+          existingCount={relations.length}
+          onApply={handleApplyGenerated}
+          onCancel={() => setPreviewOpen(false)}
+        />
+      )}
     </div>
   );
 }

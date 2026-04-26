@@ -1,7 +1,5 @@
 import { z } from 'zod';
-// @anthropic-ai/sdk 설치 후 정상 해석됨
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Tool = any;
+import type { Tool } from '@anthropic-ai/sdk/resources/messages';
 
 /** LLM이 생성한 단일 시퀀스 항목 */
 export const GeneratedSequenceSchema = z.object({
