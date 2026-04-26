@@ -241,11 +241,14 @@ MCS 플랫폼은 스마트팩토리 연구원 및 현장 엔지니어를 위한 
   - Phase C — MCS 대시보드 애니메이션: `framer-motion@^11` 설치, `useLayoutMonitor` 에 equipment/carrier `location_id` hopEvents 큐 추가 (REPLICA IDENTITY FULL payload.old 활용), `useCarrierAnimations` 훅 (RF Node.position 보간, 거리 비례 300~1500ms), AMR 위 캐리어 parent-child 오프셋 렌더, `location_id=null` 캐리어 숨김, `onInit` 배선
   - **Scope out (후속)**: OHT/Stocker 크레인 Pick/Place 내부 모션, equipment 내부 drill-down 뷰, edge smooth-step path 샘플링, ACS server-side 이관, SEMI 완전 시나리오(Task 022)
 
-- **Task 022: RTD-MCS 통합 인터페이스 구현**
+- **Task 022: RTD-MCS 통합 인터페이스 구현** ✅
   - RTD 디스패칭 결과 수신 → MacroCommand 자동 생성 API 엔드포인트
   - MCS 반송 완료 이벤트 → RTD 트리거 REST API 전송
   - 반송 제어 페이지 RTD 연동 상태 표시 + 수동 트리거 버튼 실데이터 연동
   - 단독 실행 시 F009 인터페이스 비활성 처리 (환경 변수 `NEXT_PUBLIC_RTD_ENABLED` 기반)
+  - A* vs AI PPO 하이브리드 경로 선택 (낮은 totalCost 채택)
+  - mcs_macro_command 스키마 확장 (rtd_command_id, correlation_id, source_system, algorithm 등)
+  - Playwright 자동화 검증 완료 (2026-04-20) — 리포트: `docs/phase4-integration-test-report.md`
 
 - **Task 023: 성능 최적화 + Vercel 배포 + CI/CD 구성**
   - Next.js 번들 크기 분석 및 최적화 (React Flow 지연 로딩, SVG 심볼 코드 스플리팅)
@@ -264,5 +267,5 @@ MCS 플랫폼은 스마트팩토리 연구원 및 현장 엔지니어를 위한 
 | Phase 1: 애플리케이션 골격 구축 | ✅ 완료 | 3 | 3/3 |
 | Phase 2: UI/UX 완성 (더미 데이터) | ✅ 완료 | 7 | 7/7 |
 | Phase 3: 핵심 기능 구현 | ✅ 완료 | 9 | 9/9 |
-| Phase 4: 실시간 모니터링 + 배포 | 진행 중 | 4 | 2/4 |
-| **합계** | | **23** | **21/23** |
+| Phase 4: 실시간 모니터링 + 배포 | 진행 중 | 4 | 3/4 |
+| **합계** | | **23** | **22/23** |
