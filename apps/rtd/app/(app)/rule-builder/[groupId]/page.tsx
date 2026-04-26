@@ -268,7 +268,7 @@ export default function RuleBuilderPage({
         <Button
           variant="outline"
           size="sm"
-          disabled={createRelation.isPending || createRuleDef.isPending}
+          disabled={createRelation.isPending || createRuleDef.isPending || deleteRelation.isPending}
           onClick={addSequenceNode}
         >
           <Plus className="h-3.5 w-3.5 mr-1" />
@@ -303,6 +303,7 @@ export default function RuleBuilderPage({
             onNodeClick={(_, node) => setSelectedNodeId(node.id)}
             onPaneClick={() => setSelectedNodeId(null)}
             nodeTypes={nodeTypes}
+            deleteKeyCode={null}
             fitView
             proOptions={{ hideAttribution: true }}
           >
