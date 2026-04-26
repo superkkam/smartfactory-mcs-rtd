@@ -7,6 +7,7 @@ import {
   type TransportCompleteBody,
   type TransportFailedBody,
   type DispatchAcknowledgeBody,
+  type DispatchResultBody,
 } from '@workspace/types/messages';
 import { createMessage, sendMessage } from '@workspace/types/message-client';
 import { createClient } from '@/lib/supabase/server';
@@ -66,6 +67,16 @@ export async function POST(request: NextRequest) {
       );
 
       await sendMessage(process.env.MES_API_URL, ack);
+
+      // RTD → MCS: DISPATCH_RESULT 전송 (MCS_API_URL 미설정 시 no-op)
+      void emitDispatchResult(engineResult, {
+        sourceEquipmentId: body.equipmentId,
+        lotId:             body.lotId,
+        carrierId:         body.carrierId,
+        priority:          body.priority,
+        ruleGroupId:       engineResult.ruleGroupId,
+      });
+
       return NextResponse.json(ack, { status: 200 });
     }
 
@@ -92,6 +103,12 @@ export async function POST(request: NextRequest) {
       );
 
       await sendMessage(process.env.MES_API_URL, ack);
+
+      void emitDispatchResult(engineResult, {
+        sourceEquipmentId: body.equipmentId,
+        ruleGroupId:       engineResult.ruleGroupId,
+      });
+
       return NextResponse.json(ack, { status: 200 });
     }
 
@@ -123,6 +140,15 @@ export async function POST(request: NextRequest) {
       );
 
       await sendMessage(process.env.MES_API_URL, ack);
+
+      void emitDispatchResult(engineResult, {
+        sourceEquipmentId: body.sourceEquipmentId ?? '',
+        lotId:             body.lotId,
+        carrierId:         body.carrierId,
+        priority:          body.priority,
+        ruleGroupId:       engineResult.ruleGroupId,
+      });
+
       return NextResponse.json(ack, { status: 200 });
     }
 
@@ -222,4 +248,50 @@ async function dispatchByEquipmentEvent(
     carrierId,
     dryRun: false,
   });
+}
+
+// ─── RTD → MCS DISPATCH_RESULT 송신 ──────────────────────────────────
+
+interface EmitOptions {
+  sourceEquipmentId: string;
+  lotId?:            string | null;
+  carrierId?:        string;
+  priority?:         number;
+  ruleGroupId:       string;
+}
+
+async function emitDispatchResult(
+  engineResult: Awaited<ReturnType<typeof dispatchByEquipmentEvent>>,
+  opts: EmitOptions,
+) {
+  const mcsUrl = process.env.MCS_API_URL;
+  if (!mcsUrl || !engineResult.success || !engineResult.destEquipmentId) return;
+
+  const body: DispatchResultBody = {
+    ruleGroupId:  engineResult.ruleGroupId,
+    dispatchType: 'DISPATCHING',
+    lots: [
+      {
+        lotId:             opts.lotId ?? engineResult.selectedLotId ?? 'UNKNOWN',
+        carrierId:         opts.carrierId,
+        priority:          opts.priority ?? 50,
+        sourceEquipmentId: opts.sourceEquipmentId,
+        destEquipmentId:   engineResult.destEquipmentId,
+      },
+    ],
+    executionSummary: {
+      totalSequences: 1,
+      totalDuration:  0,
+      sequences:      [],
+    },
+  };
+
+  const msg = createMessage<DispatchResultBody>('DISPATCH_RESULT', 'RTD', 'MCS', body);
+  const result = await sendMessage(mcsUrl, msg);
+
+  if (!result.ok) {
+    console.warn(`[RTD] DISPATCH_RESULT 전송 실패: ${result.error ?? result.status}`);
+  } else {
+    console.log(`[RTD] DISPATCH_RESULT 전송 완료 → MCS | dest=${engineResult.destEquipmentId}`);
+  }
 }
