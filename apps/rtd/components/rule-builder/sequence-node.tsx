@@ -60,9 +60,9 @@ export const SequenceNode = memo(function SequenceNode({ data, selected }: NodeP
       <Handle type="target" position={Position.Top} id="top" className="!bg-gray-400" />
       <Handle type="source" position={Position.Bottom} id="bottom" className="!bg-gray-400" />
 
-      {/* 좌우 핸들: 점프 (jumpNextSequence) */}
-      <Handle type="source" position={Position.Right} id="jump-out" className="!bg-amber-400 !w-2 !h-2" />
-      <Handle type="target" position={Position.Left} id="jump-in" className="!bg-amber-400 !w-2 !h-2" />
+      {/* 좌우 핸들: 점프 (jumpNextSequence) — 크기를 키워 드래그 가능하도록 */}
+      <Handle type="source" position={Position.Right} id="jump-out" className="!bg-amber-400 !w-5 !h-5 !rounded-sm" style={{ right: -10 }} />
+      <Handle type="target" position={Position.Left} id="jump-in" className="!bg-amber-400 !w-5 !h-5 !rounded-sm" style={{ left: -10 }} />
 
       {/* 헤더: 시퀀스 번호 + 필수 배지 */}
       <div className="flex items-center justify-between mb-2">

@@ -117,6 +117,12 @@ export function NodeConfigPanel({ nodeId, groupId, onClose, onDelete }: NodeConf
   const [ruleName, setRuleName] = useState(ruleDef?.ruleName ?? '');
   const [ruleType, setRuleType] = useState(ruleDef?.ruleType ?? 'Data');
   const [mandatory, setMandatory] = useState<string>(relation?.isMandatory ?? 'N');
+  const [jumpTarget, setJumpTarget] = useState<string>(
+    relation?.jumpNextSequence != null ? String(relation.jumpNextSequence) : 'none'
+  );
+  const [jumpCond, setJumpCond] = useState<string>(
+    relation?.jumpNextSequenceCondition ?? 'COUNT>0'
+  );
 
   // 테이블 선택 (Data / SubData)
   const [selectedTables, setSelectedTables] = useState<string[]>(['mcs_carrier']);
@@ -269,10 +275,12 @@ export function NodeConfigPanel({ nodeId, groupId, onClose, onDelete }: NodeConf
   async function handleSave() {
     if (!relation) return;
 
-    // 1. rule_relation 갱신 (isMandatory)
+    // 1. rule_relation 갱신 (isMandatory + jumpNextSequence)
     await updateRelation.mutateAsync({
       ...relation,
       isMandatory: mandatory,
+      jumpNextSequence: jumpTarget !== 'none' ? parseInt(jumpTarget, 10) : null,
+      jumpNextSequenceCondition: jumpTarget !== 'none' ? jumpCond : null,
     });
 
     // 2. 쿼리 저장/삭제 판단
@@ -343,6 +351,46 @@ export function NodeConfigPanel({ nodeId, groupId, onClose, onDelete }: NodeConf
               </Select>
             </div>
           </div>
+        </section>
+
+        {/* ── 조건부 점프 설정 ── */}
+        <section className="space-y-2">
+          <Label className="text-xs font-semibold text-gray-700">조건부 점프 (jumpNextSequence)</Label>
+          <div className="flex gap-2">
+            <div className="flex-1 space-y-1">
+              <Label className="text-xs text-gray-500">점프 목적지</Label>
+              <Select value={jumpTarget} onValueChange={(v) => v && setJumpTarget(v)}>
+                <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">없음</SelectItem>
+                  {relations
+                    .filter((r) => r.sequence > (relation?.sequence ?? 0))
+                    .map((r) => (
+                      <SelectItem key={r.sequence} value={String(r.sequence)}>
+                        #{r.sequence} ({r.ruleId})
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {jumpTarget !== 'none' && (
+              <div className="flex-1 space-y-1">
+                <Label className="text-xs text-gray-500">발동 조건</Label>
+                <Select value={jumpCond} onValueChange={(v) => v && setJumpCond(v)}>
+                  <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="COUNT>0">COUNT &gt; 0</SelectItem>
+                    <SelectItem value="COUNT=0">COUNT = 0</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+          {jumpTarget !== 'none' && (
+            <p className="text-xs text-amber-600">
+              결과가 <strong>{jumpCond}</strong>일 때 #{jumpTarget}로 건너뜁니다
+            </p>
+          )}
         </section>
 
         {/* ── Data / SubData: 데이터 대상 테이블 선택 (실제 mcs_* 테이블) ── */}
