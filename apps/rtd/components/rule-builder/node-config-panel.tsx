@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useRuleRelations, useUpdateRuleRelation } from '@/lib/api/rule-relations';
-import { useRuleDefs } from '@/lib/api/rule-defs';
+import { useRuleDefs, useUpdateRuleDef } from '@/lib/api/rule-defs';
 import { useRuleObjects } from '@/lib/api/rule-objects';
 import { useRuleQuery, useUpsertRuleQuery, useDeleteRuleQuery } from '@/lib/api/rule-queries';
 import { RULE_TYPES, MANDATORY_VALUES } from '@workspace/types/constants';
@@ -105,6 +105,7 @@ export function NodeConfigPanel({ nodeId, groupId, onClose, onDelete }: NodeConf
   const { data: ruleDefs = [] } = useRuleDefs();
   const { data: ruleObjects = [] } = useRuleObjects(groupId);
   const updateRelation = useUpdateRuleRelation();
+  const updateRuleDef = useUpdateRuleDef();
   const upsertQuery = useUpsertRuleQuery();
   const deleteQuery = useDeleteRuleQuery();
 
@@ -275,7 +276,12 @@ export function NodeConfigPanel({ nodeId, groupId, onClose, onDelete }: NodeConf
   async function handleSave() {
     if (!relation) return;
 
-    // 1. rule_relation 갱신 (isMandatory + jumpNextSequence)
+    // 1. 이름 변경 시 rule_def 갱신
+    if (ruleName && ruleName !== ruleDef?.ruleName) {
+      await updateRuleDef.mutateAsync({ ruleId: relation.ruleId, ruleName });
+    }
+
+    // 2. rule_relation 갱신 (isMandatory + jumpNextSequence)
     await updateRelation.mutateAsync({
       ...relation,
       isMandatory: mandatory,
@@ -648,9 +654,9 @@ export function NodeConfigPanel({ nodeId, groupId, onClose, onDelete }: NodeConf
           블록 삭제
         </Button>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={onClose} disabled={updateRelation.isPending || upsertQuery.isPending || deleteQuery.isPending}>취소</Button>
-          <Button size="sm" onClick={handleSave} disabled={!relation || updateRelation.isPending || upsertQuery.isPending || deleteQuery.isPending}>
-            {(updateRelation.isPending || upsertQuery.isPending || deleteQuery.isPending) ? '저장 중...' : '저장'}
+          <Button variant="outline" size="sm" onClick={onClose} disabled={updateRelation.isPending || updateRuleDef.isPending || upsertQuery.isPending || deleteQuery.isPending}>취소</Button>
+          <Button size="sm" onClick={handleSave} disabled={!relation || updateRelation.isPending || updateRuleDef.isPending || upsertQuery.isPending || deleteQuery.isPending}>
+            {(updateRelation.isPending || updateRuleDef.isPending || upsertQuery.isPending || deleteQuery.isPending) ? '저장 중...' : '저장'}
           </Button>
         </div>
       </div>
