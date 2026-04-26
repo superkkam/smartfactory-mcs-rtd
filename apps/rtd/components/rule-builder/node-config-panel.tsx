@@ -19,6 +19,7 @@ import { useRuleRelations, useUpdateRuleRelation } from '@/lib/api/rule-relation
 import { useRuleDefs, useUpdateRuleDef } from '@/lib/api/rule-defs';
 import { useRuleObjects } from '@/lib/api/rule-objects';
 import { useRuleQuery, useUpsertRuleQuery, useDeleteRuleQuery } from '@/lib/api/rule-queries';
+import { useRuleSort, useUpsertRuleSort } from '@/lib/api/rule-sorts';
 import { RULE_TYPES, MANDATORY_VALUES } from '@workspace/types/constants';
 import {
   MCS_TABLES,
@@ -107,12 +108,14 @@ export function NodeConfigPanel({ nodeId, groupId, onClose, onDelete }: NodeConf
   const updateRuleDef = useUpdateRuleDef();
   const upsertQuery = useUpsertRuleQuery();
   const deleteQuery = useDeleteRuleQuery();
+  const upsertSort = useUpsertRuleSort();
 
   const relation = relations.find((r) => String(r.sequence) === nodeId);
   const ruleDef = ruleDefs.find((d) => d.ruleId === relation?.ruleId);
 
-  // 저장된 쿼리 조회 (rule_query 테이블)
+  // 저장된 쿼리 / sort 조회 (relation 확정 후)
   const { data: savedQuery } = useRuleQuery(relation?.ruleId);
+  const { data: existingSort } = useRuleSort(relation?.ruleSortId);
 
   const [ruleName, setRuleName] = useState(ruleDef?.ruleName ?? '');
   const [ruleType, setRuleType] = useState(ruleDef?.ruleType ?? 'Data');
@@ -145,6 +148,12 @@ export function NodeConfigPanel({ nodeId, groupId, onClose, onDelete }: NodeConf
     if (parsed.tables.length > 0) setSelectedTables(parsed.tables);
     if (parsed.conditions.length > 0) setConditions(parsed.conditions);
   }, [savedQuery]);
+
+  // 저장된 sort 조건이 있으면 복원
+  useEffect(() => {
+    if (!existingSort) return;
+    setSortRows([{ sortColumn: existingSort.sortColumn, orderBy: existingSort.orderBy as 'ASC' | 'DESC' }]);
+  }, [existingSort]);
 
   // SQL 펼치기 여부
   const [sqlOpen, setSqlOpen] = useState(false);
@@ -280,12 +289,21 @@ export function NodeConfigPanel({ nodeId, groupId, onClose, onDelete }: NodeConf
       await updateRuleDef.mutateAsync({ ruleId: relation.ruleId, ruleName });
     }
 
-    // 2. rule_relation 갱신 (isMandatory + jumpNextSequence)
+    // 2. Sort 타입: rule_sort 저장 후 ruleSortId 확보
+    let ruleSortIdToSave = relation.ruleSortId ?? null;
+    if (ruleType === 'Sort' && sortRows.length > 0 && sortRows[0].sortColumn) {
+      const sortId = relation.ruleSortId ?? `SORT_${relation.ruleGroupId}_${relation.ruleId}`;
+      await upsertSort.mutateAsync({ ruleSortId: sortId, sortColumn: sortRows[0].sortColumn, orderBy: sortRows[0].orderBy });
+      ruleSortIdToSave = sortId;
+    }
+
+    // 3. rule_relation 갱신 (isMandatory + jumpNextSequence + ruleSortId)
     await updateRelation.mutateAsync({
       ...relation,
       isMandatory: mandatory,
       jumpNextSequence: jumpTarget !== 'none' ? parseInt(jumpTarget, 10) : null,
       jumpNextSequenceCondition: jumpTarget !== 'none' ? jumpCond : null,
+      ruleSortId: ruleSortIdToSave,
     });
 
     // 2. 쿼리 저장/삭제 판단
@@ -648,9 +666,9 @@ export function NodeConfigPanel({ nodeId, groupId, onClose, onDelete }: NodeConf
           블록 삭제
         </Button>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={onClose} disabled={updateRelation.isPending || updateRuleDef.isPending || upsertQuery.isPending || deleteQuery.isPending}>취소</Button>
-          <Button size="sm" onClick={handleSave} disabled={!relation || updateRelation.isPending || updateRuleDef.isPending || upsertQuery.isPending || deleteQuery.isPending}>
-            {(updateRelation.isPending || updateRuleDef.isPending || upsertQuery.isPending || deleteQuery.isPending) ? '저장 중...' : '저장'}
+          <Button variant="outline" size="sm" onClick={onClose} disabled={updateRelation.isPending || updateRuleDef.isPending || upsertSort.isPending || upsertQuery.isPending || deleteQuery.isPending}>취소</Button>
+          <Button size="sm" onClick={handleSave} disabled={!relation || updateRelation.isPending || updateRuleDef.isPending || upsertSort.isPending || upsertQuery.isPending || deleteQuery.isPending}>
+            {(updateRelation.isPending || updateRuleDef.isPending || upsertSort.isPending || upsertQuery.isPending || deleteQuery.isPending) ? '저장 중...' : '저장'}
           </Button>
         </div>
       </div>
