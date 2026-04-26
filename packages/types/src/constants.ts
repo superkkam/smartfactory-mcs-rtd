@@ -117,8 +117,10 @@ export type LotState = (typeof LOT_STATES)[keyof typeof LOT_STATES];
 
 /** 경로 탐색 알고리즘 유형 */
 export const ALGORITHM_TYPES = {
-  ASTAR: 'astar',
-  AI_PPO: 'ai_ppo',
+  ASTAR:   'astar',
+  AI_PPO:  'ai_ppo',
+  CACTUS:  'cactus',   // MARL-based MAPF (PPO+QMIX CTDE, Reverse Curriculum)
+  CBS_TS:  'cbs_ts',   // MILP+CBS High-level + MLA* Low-level, Search Forest
 } as const;
 export type AlgorithmType = (typeof ALGORITHM_TYPES)[keyof typeof ALGORITHM_TYPES];
 

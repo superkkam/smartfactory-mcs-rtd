@@ -18,7 +18,7 @@ function toEntity(row: Record<string, unknown>): MacroCommand {
     rtdCommandId:      (row.rtd_command_id as string | null) ?? null,
     correlationId:     (row.correlation_id as string | null) ?? null,
     sourceSystem:      (row.source_system as string | undefined) ?? 'MANUAL',
-    algorithm:         (row.algorithm as string | undefined) ?? 'ASTAR',
+    algorithm:         (row.algorithm as 'ASTAR' | 'AI_PPO' | 'CACTUS' | 'CBS_TS' | undefined) ?? 'ASTAR',
     sourceEquipmentId: (row.source_equipment_id as string | null) ?? null,
     destEquipmentId:   (row.dest_equipment_id as string | null) ?? null,
   };

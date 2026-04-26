@@ -58,6 +58,13 @@ export interface Equipment extends McsBaseEntity {
   recipeType: string;
   /** 최근 상태 갱신 시각 — stale 판단 */
   lastHeartbeatAt: string;
+  // ─── MAPF 확장: 이종 AMR 분류 및 호환성 (Task 025/026) ────────────
+  /** 이종 AMR 분류 — MLA*(Multi-Label A*) 호환성 라우팅 기준 */
+  amrType?: 'TYPE_A' | 'TYPE_B' | 'TYPE_C';
+  /** 통과/사용 가능한 노드 타입 / equipment 카테고리 화이트리스트 */
+  compatibility?: string[];
+  /** 멀티-goal 작업 시퀀스 (CBS-TS 평가용) — unit_id 순서 배열 */
+  goalSequence?: string[];
 }
 
 /** 장비 단위 — 레이아웃 모델러에서 생성·관리 */
@@ -157,8 +164,8 @@ export interface MacroCommand extends McsBaseEntity {
   correlationId?: string | null;
   /** 명령 생성 출처 ('MANUAL' | 'RTD') */
   sourceSystem?: string;
-  /** 경로 탐색 알고리즘 ('ASTAR' | 'AI_PPO') */
-  algorithm?: string;
+  /** 경로 탐색 알고리즘 */
+  algorithm?: 'ASTAR' | 'AI_PPO' | 'CACTUS' | 'CBS_TS';
   /** 출발 장비 ID (equipment_id label) — TRANSPORT_COMPLETE 콜백용 비정규화 */
   sourceEquipmentId?: string | null;
   /** 목적 장비 ID (equipment_id label) — TRANSPORT_COMPLETE 콜백용 비정규화 */

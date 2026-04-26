@@ -65,14 +65,39 @@ export type ChargeNodeData = {
   label?: string;
 };
 
+/** 통행 불가 장애물 노드 (CACTUS/CBS-TS 충돌 회피 학습용) */
+export type ObstacleNodeData = {
+  nodeId: string;
+  label?: string;
+};
+
+/** 멀티-goal 목적 마커 (CBS-TS 작업 시퀀스용) */
+export type GoalNodeData = {
+  nodeId: string;
+  goalIndex?: number;  // 시퀀스 내 순서 (0-based)
+  label?: string;
+};
+
+/** 충전 대기열 노드 (MAPF 시나리오에서 충전 경합 모델링) */
+export type ChargeQueueNodeData = {
+  nodeId: string;
+  capacity?: number;  // 동시 수용 AMR 수
+  label?: string;
+};
+
 /* ─── React Flow Node/Edge 타입 별칭 ─── */
 
-export type ProcessNode = RFNode<ProcessNodeData, 'process'>;
-export type StockerNode = RFNode<StockerNodeData, 'stocker'>;
-export type PortNode    = RFNode<PortNodeData,    'port'>;
-export type PathNode    = RFNode<PathNodeData,    'node'>;
-export type AgvNode     = RFNode<AgvNodeData,    'agv'>;
-export type ChargeNode  = RFNode<ChargeNodeData, 'charge'>;
+export type ProcessNode    = RFNode<ProcessNodeData,    'process'>;
+export type StockerNode    = RFNode<StockerNodeData,    'stocker'>;
+export type PortNode       = RFNode<PortNodeData,       'port'>;
+export type PathNode       = RFNode<PathNodeData,       'node'>;
+export type AgvNode        = RFNode<AgvNodeData,        'agv'>;
+export type ChargeNode     = RFNode<ChargeNodeData,     'charge'>;
+export type ObstacleNode   = RFNode<ObstacleNodeData,   'obstacle'>;
+export type GoalNode       = RFNode<GoalNodeData,       'goal'>;
+export type ChargeQueueNode = RFNode<ChargeQueueNodeData, 'chargeQueue'>;
 
-export type ModelerNode = ProcessNode | StockerNode | PortNode | PathNode | AgvNode | ChargeNode;
+export type ModelerNode =
+  | ProcessNode | StockerNode | PortNode | PathNode | AgvNode | ChargeNode
+  | ObstacleNode | GoalNode | ChargeQueueNode;
 export type TransferEdge = Edge<TransferEdgeData>;
