@@ -142,9 +142,16 @@ export default function LayoutModelerPage() {
       }
 
       // 구조화 테이블 동기화 (경로 탐색 엔진용)
-      await syncLayoutToDb(layoutId, nodes, edges);
+      const { droppedEdgeCount, orphanPortCount } = await syncLayoutToDb(layoutId, nodes, edges);
 
-      toast.success('레이아웃이 저장되었습니다.');
+      if (droppedEdgeCount > 0 || orphanPortCount > 0) {
+        toast.warning(
+          `레이아웃이 저장되었습니다. ` +
+          `(orphan 포트 ${orphanPortCount}개, 매핑 누락 경로 ${droppedEdgeCount}개는 경로 탐색 DB에서 제외됨)`,
+        );
+      } else {
+        toast.success('레이아웃이 저장되었습니다.');
+      }
     } catch (err) {
       console.error('[레이아웃 저장 오류]', err);
       toast.error('저장에 실패했습니다. 다시 시도해 주세요.');

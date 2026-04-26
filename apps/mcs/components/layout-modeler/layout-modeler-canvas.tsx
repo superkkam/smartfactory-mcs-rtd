@@ -299,8 +299,21 @@ export function LayoutModelerCanvas({
           data: { nodeId: d.nodeId ?? d.waypointId ?? n.id, label: d.label },
         };
       });
+
+      // 노드 ID 집합으로 orphan 엣지 필터링 + hidden 오염 제거
+      const nodeIds = new Set(migratedNodes.map((n) => n.id));
+      const validEdges = (initialEdges ?? [])
+        .filter((e) => {
+          const ok = nodeIds.has(e.source) && nodeIds.has(e.target);
+          if (!ok) console.warn(`[layout-modeler] orphan 엣지 제거: ${e.id} (${e.source}→${e.target})`);
+          return ok;
+        })
+        // json_data에 hidden이 잔류해도 relationsVisible 토글이 기준이므로 strip
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        .map(({ hidden: _h, ...rest }) => rest as Edge);
+
       setNodes(migratedNodes);
-      setEdges(initialEdges ?? []);
+      setEdges(validEdges);
       resetCounters(migratedNodes);
     }
   // initialNodes/initialEdges 참조 변경 시에만 실행

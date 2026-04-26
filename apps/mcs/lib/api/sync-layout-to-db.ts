@@ -22,7 +22,7 @@ export async function syncLayoutToDb(
   edges: Edge[],
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabaseOverride?: any,
-): Promise<void> {
+): Promise<{ droppedEdgeCount: number; orphanPortCount: number }> {
   // API Route 등 서버 환경에서는 service_role 클라이언트를 주입, 없으면 브라우저 클라이언트 사용
   const supabase = supabaseOverride ?? createClient();
 
@@ -134,6 +134,14 @@ export async function syncLayoutToDb(
   // RF id → 친숙 unit 코드 역매핑 (insert 후 unitIdToDbId 에 RF id 기준 항목도 추가하기 위해)
   const rfToUnitCode = new Map<string, string>();
 
+  const orphanPorts = portNodes.filter((n) => !nodeIdToDbId[(n.data as PortNodeData).parentEquipmentId]);
+  if (orphanPorts.length > 0) {
+    console.warn(
+      `[syncLayoutToDb] parentEquipment 매핑 없는 orphan 포트 ${orphanPorts.length}개 제외:`,
+      orphanPorts.map((n) => (n.data as PortNodeData).portId ?? n.id),
+    );
+  }
+
   const portUnitRows = portNodes
     .filter((n) => !!nodeIdToDbId[(n.data as PortNodeData).parentEquipmentId])
     .map((n) => {
@@ -229,8 +237,13 @@ export async function syncLayoutToDb(
 
   const transferEdges = edges.filter((e) => e.type === 'transfer');
 
+  const droppedEdges: Edge[] = [];
   const relationRows = transferEdges
-    .filter((e) => unitIdToDbId[e.source] && unitIdToDbId[e.target])
+    .filter((e) => {
+      const ok = !!(unitIdToDbId[e.source] && unitIdToDbId[e.target]);
+      if (!ok) droppedEdges.push(e);
+      return ok;
+    })
     .map((e) => {
       const eData = e.data as TransferEdgeData | undefined;
       return {
@@ -241,17 +254,25 @@ export async function syncLayoutToDb(
       };
     });
 
+  if (droppedEdges.length > 0) {
+    console.warn(
+      `[syncLayoutToDb] DB 매핑 누락으로 ${droppedEdges.length}개 엣지가 mcs_transfer_relation에서 제외됨:`,
+      droppedEdges.map((e) => `${e.id}(${e.source}→${e.target})`),
+    );
+  }
+
   if (relationRows.length > 0) {
     const { error: insRelErr } = await supabase
       .from('mcs_transfer_relation')
       .insert(relationRows);
     if (insRelErr) throw insRelErr;
-  } else {
-    // 전이 관계 0건: 모든 transfer 엣지의 source/target 이 유닛 매핑에 없음
+  } else if (transferEdges.length > 0) {
     console.warn(
       `[syncLayoutToDb] 전이 관계 0건 삽입 — ` +
       `transfer 엣지: ${transferEdges.length}건, ` +
       `매핑된 unitId 수: ${Object.keys(unitIdToDbId).length}`,
     );
   }
+
+  return { droppedEdgeCount: droppedEdges.length, orphanPortCount: orphanPorts.length };
 }
