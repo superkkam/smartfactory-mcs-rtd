@@ -8,3 +8,8 @@ stable-baselines3==2.4.0
 simpy==4.1.1
 numpy==1.26.4
 torch==2.5.1
+# Task 026: MILP 솔버 (오픈소스, gurobipy 미사용)
+pulp>=2.8
+# Task 025: 멀티에이전트 RL 환경 (QMIX mixer는 PyTorch 직구현, ray/epymarl 미사용)
+pettingzoo>=1.24
+supersuit>=3.9

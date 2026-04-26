@@ -175,14 +175,15 @@ class McsSimulation:
         waited = False
 
         try:
-            # 경로 계산
-            if algorithm == "ai_ppo":
-                from engine.ppo_agent import ppo_agent
-                path, _, _ = ppo_agent.predict(
-                    self.graph, source, dest, self.unit_labels
-                )
-            else:
-                path, _ = run_astar(self.graph, source, dest)
+            # 경로 계산 — Strategy 디스패치 (astar/ai_ppo/cactus/cbs_ts)
+            from engine.strategy import get_strategy
+            strategy = get_strategy(algorithm)
+            path, _, _ = strategy.predict(
+                graph=self.graph,
+                source_id=source,
+                dest_id=dest,
+                unit_labels=self.unit_labels,
+            )
 
             # A* 최적 비용 계산 (효율 점수 비교용)
             try:

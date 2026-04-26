@@ -262,13 +262,64 @@ MCS 플랫폼은 스마트팩토리 연구원 및 현장 엔지니어를 위한 
     - T022: RTD 비활성 배지/버튼, 혼잡도 토글 ON/OFF, A* vs AI 비교 카드
   - Task 023 (배포·CI): 추후 진행 예정 (보류)
 
-- **Task 023: 성능 최적화 + Vercel 배포 + CI/CD 구성**
+- **Task 023: 성능 최적화 + Vercel 배포 + CI/CD 구성** *(보류 — 논문 작업 후 진행 예정)*
   - Next.js 번들 크기 분석 및 최적화 (React Flow 지연 로딩, SVG 심볼 코드 스플리팅)
   - TanStack Query 캐싱 전략 최적화 (레이아웃 데이터 staleTime 설정)
   - `apps/mcs` Vercel 독립 배포 설정
   - `apps/ai-engine` FastAPI 배포 설정 (Railway / Fly.io 등)
   - GitHub Actions CI/CD 파이프라인 (lint, type-check, build, test)
   - 환경 변수 관리 (`.env.production`: Supabase URL/Key, FastAPI URL)
+
+---
+
+### Phase 5: MAPF 알고리즘 확장 (논문용)
+
+> 논문 작성을 위한 비교 실험 알고리즘(CACTUS, CBS-TS) 추가 + 8×8 MAPF 레이아웃 재설계
+
+- ✅ **Task 025-pre: MAPF 인프라 스캐폴딩 + 엣지 가시성 버그 수정** — 완료 (2026-04-26)
+  - **Phase A — 엣지 가시성 버그 수정**: 저장된 경로가 캔버스에 100% 표시되도록 보장
+    - `layout-modeler-canvas.tsx`: orphan 엣지 자동 필터링 + `hidden` 오염 제거
+    - `sync-layout-to-db.ts`: orphan 포트/드롭 엣지 경고 로깅 + 반환값(`droppedEdgeCount`, `orphanPortCount`) 추가
+    - `page.tsx`: 드롭 발생 시 경고 토스트 노출
+    - `docs/migrations/007-orphan-relation-cleanup.sql`: orphan relation 진단 쿼리
+    - E2E 테스트: `tests/e2e/09-edge-visibility.spec.ts`
+  - **Phase B — MAPF 레이아웃 재설계**: 8×8 그리드 + 이종 AMR 지원
+    - `types.ts`: `obstacle`, `goal`, `chargeQueue` 노드 타입 추가
+    - `packages/types/src/mcs.ts`: `Equipment.amrType`, `.compatibility`, `.goalSequence` 필드 추가
+    - `packages/types/src/constants.ts`: `ALGORITHM_TYPES` 4-value 확장 (CACTUS, CBS_TS)
+    - `lib/dummy/mapf-layout.ts`: 8×8 그리드 시드 (PathNode×64, Stocker×4, Process×6, Charge×4, Obstacle×8, AGV×8)
+    - `app/api/seed-mapf-layout/route.ts`: MAPF 레이아웃 시드 API
+    - `docs/migrations/008-mapf-algorithm-enum.sql`: CHECK 제약 4-value 확장
+    - E2E 테스트: `tests/e2e/10-mapf-layout-seed.spec.ts`
+  - **Phase C — Strategy 디스패처 + 알고리즘 스캐폴딩**:
+    - `engine/strategy.py`: `RouteStrategy` ABC + `STRATEGY_REGISTRY` (4개 알고리즘)
+    - `engine/cactus/`: `multi_agent_env.py`, `qmix_mixer.py`, `reverse_curriculum.py`, `train.py`
+    - `engine/cbs_ts/`: `milp_task_order.py`, `cbs_high_level.py`, `mla_star.py`, `search_forest.py`
+    - `routers/inference.py`: `algorithm` 파라미터 + Strategy 디스패치, 미구현 → 503
+    - `engine/simulation.py`: if/else 제거 → Strategy Registry 사용
+    - `requirements.txt`: `pulp>=2.8`, `pettingzoo>=1.24`, `supersuit>=3.9` 추가
+    - AI 엔진 단위 테스트: `tests/test_strategy_dispatch.py` (8 케이스)
+    - E2E 테스트: `tests/e2e/11-algorithm-enum.spec.ts`
+
+- **Task 025: CACTUS 통합** — 진행 예정
+  - PPO 다중 에이전트 학습 루프 (PettingZoo ParallelEnv → SB3)
+  - QMIX Mixer 구현 (PyTorch, CTDE monotonic value factorization)
+  - Reverse Curriculum 자동 난이도 확장 (`μ−η·σ ≥ U` 수렴 검증)
+  - MAPF Grid 8×8 환경에서 학습 (obstacle 회피, 충돌 없는 경로)
+  - A* / PPO 대비 makespan / throughput / collision rate 비교 실험
+
+- **Task 026: CBS-TS 통합** — 진행 예정
+  - MILP 작업 순서 최적화 (`pulp`, makespan 최소화, AMR 호환성 제약)
+  - CBS High-Level: Constraint Tree + Vertex/Edge/Following 충돌 분류
+  - MLA* Low-Level: 이종 AMR 유형 라벨 기반 경로 탐색
+  - Search Forest 구조 (다중 루트 트리 병렬 탐색, 제약 재사용)
+  - CBS-TS vs CACTUS vs A* 이종 AMR 시나리오 비교
+
+- **Task 027: MAPF 평가 + 논문 데이터 수집** — 진행 예정
+  - 8~128 AMR 스케일 비교 (ASTAR / AI_PPO / CACTUS / CBS_TS)
+  - 주요 지표: makespan, throughput, collision_rate, 학습 수렴 시간
+  - CSV / PNG 자동 산출 파이프라인 (논문 그림/표 생성)
+  - Playwright 통합 검증 업데이트 (Task 025/026 완성 후)
 
 ---
 
@@ -280,4 +331,5 @@ MCS 플랫폼은 스마트팩토리 연구원 및 현장 엔지니어를 위한 
 | Phase 2: UI/UX 완성 (더미 데이터) | ✅ 완료 | 7 | 7/7 |
 | Phase 3: 핵심 기능 구현 | ✅ 완료 | 9 | 9/9 |
 | Phase 4: 실시간 모니터링 + 배포 | 진행 중 | 5 | 4/5 |
-| **합계** | | **24** | **23/24** |
+| Phase 5: MAPF 알고리즘 확장 (논문용) | 진행 중 | 4 | 1/4 |
+| **합계** | | **28** | **24/28** |

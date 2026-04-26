@@ -14,6 +14,8 @@ class InferenceRequest(BaseModel):
     destUnitId: str
     # 동적 가중치: unitId → 혼잡도 팩터 (0.0~1.0)
     dynamicWeights: Optional[Dict[str, float]] = None
+    # 경로 탐색 알고리즘 (astar | ai_ppo | cactus | cbs_ts), 기본 ai_ppo
+    algorithm: Optional[str] = "ai_ppo"
 
 
 class AiRouteStep(BaseModel):
