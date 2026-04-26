@@ -32,7 +32,7 @@ import { LlmPreviewModal } from '@/components/rule-builder/llm-preview-modal';
 import { buildGraph } from '@/lib/rule-builder/build-graph';
 import { useRuleGroup } from '@/lib/api/rule-groups';
 import { useRuleRelations, useCreateRuleRelation, useDeleteRuleRelation, useUpdateRuleRelation } from '@/lib/api/rule-relations';
-import { useRuleDefs } from '@/lib/api/rule-defs';
+import { useRuleDefs, useCreateRuleDef } from '@/lib/api/rule-defs';
 import { RULE_TYPES } from '@workspace/types/constants';
 import type { RuleRelation } from '@workspace/types/rtd';
 import type { RuleDef } from '@workspace/types/rtd';
@@ -58,6 +58,7 @@ export default function RuleBuilderPage({
   const createRelation = useCreateRuleRelation();
   const deleteRelation = useDeleteRuleRelation();
   const updateRelation = useUpdateRuleRelation();
+  const createRuleDef  = useCreateRuleDef();
 
   /** React Flow 상태 */
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
@@ -76,7 +77,6 @@ export default function RuleBuilderPage({
   /** UI 상태 */
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [newRuleType, setNewRuleType] = useState<string>('Data'); // 블록 추가 유형
-  const [newRuleId, setNewRuleId] = useState<string>('');         // 블록 추가 대상 룰
 
   /** LLM 미리보기 모달 상태 */
   const [previewSequences, setPreviewSequences] = useState<GeneratedSequence[]>([]);
@@ -85,12 +85,6 @@ export default function RuleBuilderPage({
   /** 점프 엣지 연결 다이얼로그 상태 */
   const [jumpDialog, setJumpDialog] = useState<{ sourceSeq: number; targetSeq: number } | null>(null);
   const [jumpCondition, setJumpCondition] = useState<'COUNT>0' | 'COUNT=0'>('COUNT>0');
-
-  /** 선택된 유형에 맞는 룰 목록 */
-  const availableRules = useMemo(
-    () => ruleDefs.filter((d) => d.ruleType === newRuleType),
-    [ruleDefs, newRuleType]
-  );
 
   const onConnect = useCallback(
     (connection: Connection) => {
@@ -139,27 +133,37 @@ export default function RuleBuilderPage({
     setJumpDialog(null);
   }
 
-  /** 블록 추가 */
+  /** 블록 추가 — 유형만 선택하면 고유 rule_def 자동 생성 */
   async function addSequenceNode() {
-    if (!newRuleId) {
-      alert('추가할 룰을 선택하세요.');
-      return;
-    }
     const maxSeq = relations.length > 0 ? Math.max(...relations.map((r) => r.sequence)) : 0;
     const newSeq = maxSeq + 1;
-    const filterSeq = maxSeq > 0 ? maxSeq : null;
+
+    // 타입별 기본값
+    const classId = newRuleType === 'Filter' ? 'RC003' : 'RC002';
+    const defaultName: Record<string, string> = {
+      Data: '데이터 조회', SubData: '서브 데이터', Filter: '필터',
+      Sort: '정렬', Join: 'Join', Groupby: '그룹화', Method: '메서드',
+    };
+    // 고유 rule_id: 그룹ID_타입_36진수타임스탬프
+    const newRuleId = `${groupId}_${newRuleType.toUpperCase()}_${Date.now().toString(36)}`;
+
+    await createRuleDef.mutateAsync({
+      ruleId:      newRuleId,
+      ruleName:    `${defaultName[newRuleType] ?? newRuleType} ${newSeq}`,
+      ruleClassId: classId,
+      ruleType:    newRuleType,
+    });
 
     await createRelation.mutateAsync({
-      ruleGroupId: groupId,
-      ruleId: newRuleId,
-      sequence: newSeq,
-      isMandatory: 'N',
-      filterSequence: filterSeq,
-      jumpNextSequence: null,
+      ruleGroupId:              groupId,
+      ruleId:                   newRuleId,
+      sequence:                 newSeq,
+      isMandatory:              'N',
+      filterSequence:           maxSeq > 0 ? maxSeq : null,
+      jumpNextSequence:         null,
       jumpNextSequenceCondition: null,
-      ruleSortId: null,
+      ruleSortId:               null,
     });
-    setNewRuleId('');
   }
 
   /** LLM 생성 시퀀스 일괄 적용 */
@@ -250,10 +254,7 @@ export default function RuleBuilderPage({
 
       {/* 블록 추가 컨트롤 */}
       <div className="flex items-center gap-2">
-        <Select
-          value={newRuleType}
-          onValueChange={(v) => { if (v) { setNewRuleType(v); setNewRuleId(''); } }}
-        >
+        <Select value={newRuleType} onValueChange={(v) => v && setNewRuleType(v)}>
           <SelectTrigger className="w-36">
             <SelectValue />
           </SelectTrigger>
@@ -264,25 +265,10 @@ export default function RuleBuilderPage({
           </SelectContent>
         </Select>
 
-        <Select value={newRuleId} onValueChange={(v) => v && setNewRuleId(v)}>
-          <SelectTrigger className="w-48">
-            <SelectValue placeholder="룰 선택" />
-          </SelectTrigger>
-          <SelectContent>
-            {availableRules.length === 0 ? (
-              <SelectItem value="__none" disabled>해당 유형의 룰 없음</SelectItem>
-            ) : (
-              availableRules.map((d) => (
-                <SelectItem key={d.ruleId} value={d.ruleId}>{d.ruleName}</SelectItem>
-              ))
-            )}
-          </SelectContent>
-        </Select>
-
         <Button
           variant="outline"
           size="sm"
-          disabled={!newRuleId || createRelation.isPending}
+          disabled={createRelation.isPending || createRuleDef.isPending}
           onClick={addSequenceNode}
         >
           <Plus className="h-3.5 w-3.5 mr-1" />
