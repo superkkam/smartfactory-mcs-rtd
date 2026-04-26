@@ -46,7 +46,15 @@ async def run_inference(req: InferenceRequest) -> InferenceResponse:
     if dest_uuid not in label_to_uuid.values():
         raise HTTPException(status_code=404, detail=f"도착 노드 없음: {req.destUnitId}")
 
-    # 3. PPO 추론 (폴백 포함)
+    # 3. dynamicWeights 키 변환: 프론트는 라벨(ND-025) 기반 전달 → UUID로 변환
+    raw_dw = req.dynamicWeights or {}
+    dynamic_weights_uuid: dict[str, float] = {}
+    for key, factor in raw_dw.items():
+        # 키가 이미 UUID이면 그대로, 라벨이면 변환
+        uuid_key = label_to_uuid.get(key, key)
+        dynamic_weights_uuid[uuid_key] = float(factor)
+
+    # 4. PPO 추론 (폴백 포함)
     start_ts = time.time()
     try:
         path_uuids, total_cost, confidence = ppo_agent.predict(
@@ -54,7 +62,7 @@ async def run_inference(req: InferenceRequest) -> InferenceResponse:
             source_id=source_uuid,
             dest_id=dest_uuid,
             unit_labels=unit_labels,
-            dynamic_weights=req.dynamicWeights,
+            dynamic_weights=dynamic_weights_uuid if dynamic_weights_uuid else None,
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -65,13 +73,12 @@ async def run_inference(req: InferenceRequest) -> InferenceResponse:
     inference_time_ms = (time.time() - start_ts) * 1000
     is_fallback = not ppo_agent.is_loaded
 
-    # 4. 응답 구성 (AiRouteStep 배열)
-    dynamic_weights = req.dynamicWeights or {}
+    # 5. 응답 구성 (AiRouteStep 배열) — UUID 키로 변환된 맵 사용
     route_steps: list[AiRouteStep] = []
 
     for i, uid in enumerate(path_uuids):
         label = unit_labels.get(uid, uid)
-        congestion = dynamic_weights.get(uid, 0.0)
+        congestion = dynamic_weights_uuid.get(uid, 0.0)
 
         # 구간 가중치 계산 (이전 노드와의 엣지 weight)
         edge_weight = 1.0

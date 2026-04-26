@@ -20,20 +20,18 @@ function getRtdUrl(): string | undefined {
   return process.env.RTD_API_URL;
 }
 
-/** RTD 연동 활성 여부 (클라이언트+서버 공용) */
+/** RTD 연동 활성 여부 — 클라이언트에서는 NEXT_PUBLIC_RTD_ENABLED 만 참조 */
 export function isRtdEnabled(): boolean {
-  return (
-    process.env.NEXT_PUBLIC_RTD_ENABLED === 'true' ||
-    process.env.RTD_API_URL !== undefined
-  );
+  return process.env.NEXT_PUBLIC_RTD_ENABLED === 'true';
 }
 
 /**
  * MCS → RTD: 반송 완료 알림
- * MacroCommand 완료 후 호출
+ * @param correlationId 원본 DISPATCH_RESULT 의 correlationId (에코)
  */
 export async function sendTransportComplete(
   params: Omit<TransportCompleteBody, 'status'>,
+  correlationId?: string,
 ): Promise<SendResult> {
   const body: TransportCompleteBody = { ...params, status: 'COMPLETED' };
   const msg = createMessage<TransportCompleteBody>(
@@ -41,6 +39,7 @@ export async function sendTransportComplete(
     'MCS',
     'RTD',
     body,
+    correlationId ? { correlationId } : undefined,
   );
   return sendMessage(getRtdUrl(), msg);
 }

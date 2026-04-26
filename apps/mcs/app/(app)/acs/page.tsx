@@ -165,7 +165,13 @@ export default function AcsPage() {
         {/* 시나리오 시더 패널 */}
         <div className="w-72 shrink-0 space-y-4">
           {/* 퀵 데모: 대시보드 실시간 확인용 */}
-          <QuickDemo equipments={equipments} units={units} carriers={carriers} />
+          <QuickDemo
+            equipments={equipments}
+            units={units}
+            carriers={carriers}
+            layoutEdges={layoutEdges}
+            layoutNodes={layoutNodes}
+          />
 
           {/* 반송 명령 현황 + 취소 */}
           <CommandQueuePanel units={units} />

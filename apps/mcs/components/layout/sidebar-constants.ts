@@ -1,6 +1,7 @@
 import {
   BarChart2,
   Bot,
+  GitFork,
   LayoutDashboard,
   Map,
   Package,
@@ -34,6 +35,11 @@ export const NAV_ITEMS: NavItem[] = [
     title: '반송 제어',
     href: '/transfer-control',
     icon: Truck,
+  },
+  {
+    title: '릴레이션 뷰어',
+    href: '/transfer-relations',
+    icon: GitFork,
   },
   {
     title: 'ACS',

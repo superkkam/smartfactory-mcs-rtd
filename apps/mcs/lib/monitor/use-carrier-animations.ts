@@ -21,9 +21,9 @@ import type { Equipment, EquipmentUnit, Carrier } from '@workspace/types/mcs';
 import type { HopEvent } from '@/lib/api/layout-monitor';
 
 /** 이동 속도 및 시간 파라미터 */
-const MIN_DURATION_MS  = 400;   // 단일 구간 최소 이동 시간 (ms)
-const MAX_DURATION_MS  = 800;   // 단일 구간 최대 이동 시간 — Quick Demo 1000ms 대비 200ms 여유
-const SPEED_PX_PER_SEC = 150;   // 픽셀/초
+const MIN_DURATION_MS  = 200;   // 마이크로 hop 플리커 방지 하한
+const MAX_DURATION_MS  = 8000;  // 비정상 루프 방지 실용 상한 (사실상 비활성)
+const SPEED_PX_PER_SEC = 120;   // 픽셀/초 — 거리 비례 일정 속도 보장
 /** 큐 최대 허용 대기 hop 수 (초과 시 오래된 hop ack + 최신 위치로 스냅) */
 const MAX_PENDING = 2;
 
@@ -75,9 +75,11 @@ function bfsRfPath(fromId: string, toId: string, edges: Edge[]): string[] | null
 
   const adj = new Map<string, string[]>();
   for (const e of edges) {
+    // 양방향 인접 리스트 — bi() 엣지가 한 방향만 존재할 수 있으므로 명시적 양방향
     if (!adj.has(e.source)) adj.set(e.source, []);
     adj.get(e.source)!.push(e.target);
-    // 역방향 엣지 제거 — 텔레포트(역방향 점프) 시 BFS 실패 → 즉시 스냅 처리
+    if (!adj.has(e.target)) adj.set(e.target, []);
+    adj.get(e.target)!.push(e.source);
   }
 
   const visited = new Set<string>([fromId]);
@@ -334,6 +336,10 @@ export function useCarrierAnimations({
   const entityHopMapRef    = useRef<Map<string, string>>(new Map());
   /** requestAnimationFrame handle — re-render 배치용 */
   const tickRafRef         = useRef<number | null>(null);
+  /** 최초 1회 초기화된 entityId 집합 — Init effect 멱등성 보장 */
+  const initializedEntitiesRef = useRef<Set<string>>(new Set());
+  /** entityId → 마지막으로 알려진 unit DB ID (REPLICA IDENTITY null 폴백용) */
+  const lastKnownUnitIdRef  = useRef<Map<string, string>>(new Map());
 
   // stale 클로저 방지 — 최신 props 를 ref 로 동기화
   const unitsRef          = useRef(units);
@@ -361,14 +367,23 @@ export function useCarrierAnimations({
   }
 
   // ── 초기화: AGV 가 처음 등장할 때 positionsRef 에 현재 위치 설정 ──────────
-  // useLayoutEffect → paint 전에 실행되므로 eq.locationId 폴백보다 먼저 값을 채움
-  // → 첫 hop 도착 시 한 프레임 동안 목적지에 렌더되는 순간이동 방지
+  // initializedEntitiesRef 로 멱등성 보장:
+  //   한 번 초기화된 AGV는 equipments.locationId 가 변경되어도 positionsRef 를 덮어쓰지 않음.
+  //   이후 위치 갱신은 Hop effect 가 전담 → Init/Hop race condition 차단.
   useLayoutEffect(() => {
     for (const eq of equipments) {
       if (eq.equipmentType !== 'AGV') continue;
-      if (positionsRef.current.has(eq.id)) continue; // 이미 애니메이션이 관리 중
+      if (initializedEntitiesRef.current.has(eq.id)) continue;
+      if (positionsRef.current.has(eq.id)) {
+        initializedEntitiesRef.current.add(eq.id);
+        continue;
+      }
       const pos = unitToRFPosition(eq.locationId ?? '', units, equipmentNodes, equipments);
-      if (pos) positionsRef.current.set(eq.id, pos);
+      if (pos) {
+        positionsRef.current.set(eq.id, pos);
+        initializedEntitiesRef.current.add(eq.id);
+        if (eq.locationId) lastKnownUnitIdRef.current.set(eq.id, eq.locationId);
+      }
     }
   }, [equipments, units, equipmentNodes]);
 
@@ -422,9 +437,11 @@ export function useCarrierAnimations({
       if (animatingHopIdsRef.current.has(ev.id)) continue;
 
       // fromPos: 현재 보간 위치 → 없으면 DB의 출발 위치
+      // fromUnitId: ev.fromUnitId 우선, null이면 lastKnownUnitIdRef 폴백 (REPLICA IDENTITY 미적용 환경)
+      const fromUnitId = ev.fromUnitId ?? lastKnownUnitIdRef.current.get(entityId) ?? null;
       let fromPos = positionsRef.current.get(entityId) ?? null;
-      if (!fromPos && ev.fromUnitId) {
-        fromPos = unitToRFPosition(ev.fromUnitId, _units, _equipmentNodes, _equipments);
+      if (!fromPos && fromUnitId) {
+        fromPos = unitToRFPosition(fromUnitId, _units, _equipmentNodes, _equipments);
       }
 
       const toPos = unitToRFPosition(ev.toUnitId, _units, _equipmentNodes, _equipments);
@@ -438,6 +455,7 @@ export function useCarrierAnimations({
       if (!fromPos) {
         // 최초 등장 → toPos 로 스냅 후 ack
         positionsRef.current.set(entityId, toPos);
+        if (ev.toUnitId) lastKnownUnitIdRef.current.set(entityId, ev.toUnitId);
         ackHopEvent(ev.id);
         setTick((t) => t + 1);
         continue;
@@ -447,30 +465,28 @@ export function useCarrierAnimations({
       // (useLayoutEffect 내 실행 → render 보다 먼저 반영)
       positionsRef.current.set(entityId, fromPos);
 
+      // fromPos == toPos → 0픽셀 보간 무음 실패 방지 (Init/Hop race 안전망)
+      if (Math.hypot(fromPos.x - toPos.x, fromPos.y - toPos.y) < 1) {
+        if (ev.toUnitId) lastKnownUnitIdRef.current.set(entityId, ev.toUnitId);
+        ackHopEvent(ev.id);
+        setTick((t) => t + 1);
+        continue;
+      }
+
       // ── BFS 경로 탐색 → getSmoothStepPath 기반 엣지 경로 샘플링 ──────
       // 각 엣지의 실제 L자/ㄷ자 SVG 경로를 따라 waypoints 생성
       // → 대각선이 아닌 실제 릴레이션 경로 위를 이동
-      const fromNode = ev.fromUnitId ? unitIdToRfNode(ev.fromUnitId, _units, _equipmentNodes) : null;
-      const toNode   = ev.toUnitId   ? unitIdToRfNode(ev.toUnitId,   _units, _equipmentNodes) : null;
+      // rfPath 전체(멀티홉 포함)를 따라 순차 애니메이션 → AGV가 항상 릴레이션 위만 이동
+      const fromNode = fromUnitId ? unitIdToRfNode(fromUnitId, _units, _equipmentNodes) : null;
+      const toNode   = ev.toUnitId ? unitIdToRfNode(ev.toUnitId, _units, _equipmentNodes) : null;
 
       const waypoints: Array<{ x: number; y: number }> = [];
 
       if (fromNode && toNode && fromNode.id !== toNode.id) {
         const rfPath = bfsRfPath(fromNode.id, toNode.id, _layoutEdges);
 
-        // 비인접 hop (텔레포트) → 즉시 스냅 (역주행 방지)
-        // 정상 hop: rfPath = [A, B] (길이=2, 직접 연결 엣지)
-        // 텔레포트: rfPath = [A, X, Y, B] (길이>2, 다중 hop = 비인접 이동)
-        // → 역방향 엣지로 경로를 찾더라도 길이>2이면 역주행 없이 즉시 스냅
-        if (rfPath && rfPath.length > 2) {
-          positionsRef.current.set(entityId, toPos);
-          ackHopEvent(ev.id);
-          setTick((t) => t + 1);
-          continue;
-        }
-
-        // 인접 노드 (길이=2) → 엣지 경로 따라 애니메이션
-        if (rfPath && rfPath.length === 2) {
+        // BFS 성공 → rfPath의 모든 인접 쌍을 엣지 경로로 연결 (멀티홉도 엣지 따라 이동)
+        if (rfPath && rfPath.length >= 2) {
           for (let i = 0; i < rfPath.length - 1; i++) {
             const curId  = rfPath[i];
             const nextId = rfPath[i + 1];
@@ -493,19 +509,22 @@ export function useCarrierAnimations({
               }
             }
 
-            // 엣지를 찾지 못한 경우 → 노드 중심점 직선 폴백
+            // 엣지를 못 찾으면(일관성 깨짐) → 중심점만 추가 (거의 발생 안 함)
             const n = _equipmentNodes.find((nd) => nd.id === nextId);
             if (n) waypoints.push(rfNodeCenter(n));
           }
         }
       }
 
-      if (waypoints.length === 0) waypoints.push(toPos);
-
-      // BFS 경로를 찾지 못한 경우 (텔레포트 / 역방향 점프) → 즉시 스냅
-      // from/to 노드가 다르고 waypoints 가 toPos 하나뿐이면 단방향 BFS 실패를 의미
-      const isTeleportSnap =
-        fromNode && toNode && fromNode.id !== toNode.id && waypoints.length === 1;
+      // waypoints 가 비어있으면 릴레이션 연결이 없는 이동
+      // → 직선 폴백 대신 즉시 스냅 (릴레이션 외 이동 완전 차단)
+      if (waypoints.length === 0) {
+        positionsRef.current.set(entityId, toPos);
+        if (ev.toUnitId) lastKnownUnitIdRef.current.set(entityId, ev.toUnitId);
+        ackHopEvent(ev.id);
+        setTick((t) => t + 1);
+        continue;
+      }
 
       // ── 거리 기반 duration 산출 ────────────────────────────────────────
       const distances: number[] = [];
@@ -521,8 +540,7 @@ export function useCarrierAnimations({
       //  홉당 7~14초가 되는 버그가 있었음. MAX_PENDING snap 텔레포트의 근본 원인.)
       const totalMs  = (totalDist / SPEED_PX_PER_SEC) * 1000;
       const clamped  = Math.min(MAX_DURATION_MS, Math.max(MIN_DURATION_MS, totalMs));
-      // 텔레포트는 duration=0 → framer-motion 즉시 완료 (스냅)
-      const duration = isTeleportSnap ? 0 : clamped / 1000;
+      const duration = clamped / 1000;
 
       let cum = 0;
       const times = distances.map((d) => {
@@ -555,6 +573,7 @@ export function useCarrierAnimations({
           activeAnimsRef.current.delete(entityId);
           animatingHopIdsRef.current.delete(hopId);
           entityHopMapRef.current.delete(entityId);
+          if (ev.toUnitId) lastKnownUnitIdRef.current.set(entityId, ev.toUnitId);
           ackHopEvent(hopId);
           scheduleRender();
         },

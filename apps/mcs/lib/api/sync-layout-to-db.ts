@@ -20,8 +20,11 @@ export async function syncLayoutToDb(
   layoutId: string,
   nodes: Node[],
   edges: Edge[],
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabaseOverride?: any,
 ): Promise<void> {
-  const supabase = createClient();
+  // API Route 등 서버 환경에서는 service_role 클라이언트를 주입, 없으면 브라우저 클라이언트 사용
+  const supabase = supabaseOverride ?? createClient();
 
   // ── 1. 기존 구간 연결 먼저 삭제 (FK 제약: unit 삭제 전 relation 삭제 필요) ─
 
@@ -85,7 +88,7 @@ export async function syncLayoutToDb(
 
     // equipment_id(친숙 코드) → DB uuid 매핑
     const codeToEqpDbId: Record<string, string> = {};
-    (insertedEqp ?? []).forEach((row) => {
+    (insertedEqp ?? []).forEach((row: { equipment_id: string; id: string }) => {
       codeToEqpDbId[row.equipment_id] = row.id;
     });
 
@@ -191,8 +194,7 @@ export async function syncLayoutToDb(
       .select('id, equipment_unit_id');
     if (insUnitErr) throw insUnitErr;
 
-    (insertedUnits ?? []).forEach((row) => {
-      // 친숙 코드 → DB uuid
+    (insertedUnits ?? []).forEach((row: { equipment_unit_id: string; id: string }) => {
       unitIdToDbId[row.equipment_unit_id] = row.id;
     });
 

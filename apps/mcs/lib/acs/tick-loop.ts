@@ -254,6 +254,7 @@ export function useAcsTickLoop({
             if (remaining.length === 0) {
               // 모든 micro 가 완료됐는데 macro 만 InProgress 인 경우 → macro Completed 처리
               await supabase.from('mcs_macro_command').update({ state: 'Completed' }).eq('id', macro.id as string);
+              void notifyRtdComplete(macro.id as string, supabase);
               continue;
             }
             // 남은 micro 를 모두 Pending 으로 리셋
@@ -513,6 +514,9 @@ export function useAcsTickLoop({
                 .from('mcs_macro_command')
                 .update({ state: 'Completed' })
                 .eq('id', vehicle.currentMacroCommandId);
+
+              // RTD 반송 완료 알림 (RTD 원천 macro 만, fire & forget)
+              void notifyRtdComplete(vehicle.currentMacroCommandId, supabase);
             }
 
             // AMR 상태 초기화
@@ -592,4 +596,43 @@ export function useAcsTickLoop({
   }, [stop]);
 
   return { acsState, isLeaderTab, start, stop };
+}
+
+// ─── RTD 반송 완료 알림 헬퍼 (fire & forget) ─────────────────────────
+// Supabase client 타입은 any 허용 (SupabaseClient 가 제네릭)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function notifyRtdComplete(macroId: string, supabase: any) {
+  try {
+    const { data: macro } = await supabase
+      .from('mcs_macro_command')
+      .select('rtd_command_id, correlation_id, algorithm, carrier_id, source_equipment_id, dest_equipment_id, created_at')
+      .eq('id', macroId)
+      .maybeSingle();
+
+    if (!macro?.rtd_command_id) return;
+
+    const now       = new Date().toISOString();
+    const startedAt = (macro.created_at as string | null) ?? now;
+    const duration  = Date.now() - new Date(startedAt).getTime();
+
+    await fetch('/api/rtd/notify', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        commandId:         macro.rtd_command_id as string,
+        lotId:             (macro.carrier_id as string | null) ?? '',
+        sourceEquipmentId: (macro.source_equipment_id as string | null) ?? '',
+        destEquipmentId:   (macro.dest_equipment_id as string | null) ?? '',
+        startTime:         startedAt,
+        endTime:           now,
+        transportDuration: duration,
+        route:             [] as string[],
+        algorithm:         ((macro.algorithm as string | null) ?? 'ASTAR') as 'ASTAR' | 'AI_PPO',
+        triggerNextDispatch: false,
+        correlationId:     (macro.correlation_id as string | null) ?? undefined,
+      }),
+    });
+  } catch {
+    // RTD 미기동 등 네트워크 오류는 무시
+  }
 }

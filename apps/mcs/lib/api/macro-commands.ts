@@ -7,26 +7,38 @@ const QUERY_KEY = 'mcs_macro_command';
 /** DB row → TypeScript 타입 변환 */
 function toEntity(row: Record<string, unknown>): MacroCommand {
   return {
-    id:           row.id as string,
-    commandId:    row.command_id as string,
-    carrierId:    row.carrier_id as string,
-    sourceUnitId: row.source_unit_id as string,
-    destUnitId:   row.dest_unit_id as string,
-    state:        row.state as string,
-    priority:     row.priority as number,
-    createdAt:    row.created_at as string,
+    id:                row.id as string,
+    commandId:         row.command_id as string,
+    carrierId:         row.carrier_id as string,
+    sourceUnitId:      row.source_unit_id as string,
+    destUnitId:        row.dest_unit_id as string,
+    state:             row.state as string,
+    priority:          row.priority as number,
+    createdAt:         row.created_at as string,
+    rtdCommandId:      (row.rtd_command_id as string | null) ?? null,
+    correlationId:     (row.correlation_id as string | null) ?? null,
+    sourceSystem:      (row.source_system as string | undefined) ?? 'MANUAL',
+    algorithm:         (row.algorithm as string | undefined) ?? 'ASTAR',
+    sourceEquipmentId: (row.source_equipment_id as string | null) ?? null,
+    destEquipmentId:   (row.dest_equipment_id as string | null) ?? null,
   };
 }
 
 /** TypeScript 타입 → DB row 변환 */
 function toRow(entity: Partial<MacroCommand>) {
   return {
-    ...(entity.commandId    !== undefined && { command_id:     entity.commandId }),
-    ...(entity.carrierId    !== undefined && { carrier_id:     entity.carrierId }),
-    ...(entity.sourceUnitId !== undefined && { source_unit_id: entity.sourceUnitId }),
-    ...(entity.destUnitId   !== undefined && { dest_unit_id:   entity.destUnitId }),
-    ...(entity.state        !== undefined && { state:          entity.state }),
-    ...(entity.priority     !== undefined && { priority:       entity.priority }),
+    ...(entity.commandId         !== undefined && { command_id:           entity.commandId }),
+    ...(entity.carrierId         !== undefined && { carrier_id:           entity.carrierId }),
+    ...(entity.sourceUnitId      !== undefined && { source_unit_id:       entity.sourceUnitId }),
+    ...(entity.destUnitId        !== undefined && { dest_unit_id:         entity.destUnitId }),
+    ...(entity.state             !== undefined && { state:                entity.state }),
+    ...(entity.priority          !== undefined && { priority:             entity.priority }),
+    ...(entity.rtdCommandId      !== undefined && { rtd_command_id:       entity.rtdCommandId }),
+    ...(entity.correlationId     !== undefined && { correlation_id:       entity.correlationId }),
+    ...(entity.sourceSystem      !== undefined && { source_system:        entity.sourceSystem }),
+    ...(entity.algorithm         !== undefined && { algorithm:            entity.algorithm }),
+    ...(entity.sourceEquipmentId !== undefined && { source_equipment_id:  entity.sourceEquipmentId }),
+    ...(entity.destEquipmentId   !== undefined && { dest_equipment_id:    entity.destEquipmentId }),
   };
 }
 

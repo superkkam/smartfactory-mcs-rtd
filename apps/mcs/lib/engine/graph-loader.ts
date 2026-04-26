@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/server';
 import type { GraphNode } from './types';
 
 /**
@@ -13,7 +13,8 @@ import type { GraphNode } from './types';
  * @returns unitId(DB uuid) → GraphNode 맵
  */
 export async function loadGraph(layoutId: string): Promise<Map<string, GraphNode>> {
-  const supabase = await createClient();
+  // RLS 우회: API 라우트에서 세션 없이 호출되므로 service_role 클라이언트 사용
+  const supabase = createAdminClient();
 
   // 전이 관계 전체 로드
   const { data: relations, error: relErr } = await supabase

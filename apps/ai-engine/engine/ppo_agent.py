@@ -82,7 +82,7 @@ class PpoAgent:
             - confidence: 0~1 (폴백 시 0.0)
         """
         if not self.is_loaded or self.model is None:
-            return self._astar_fallback(graph, source_id, dest_id)
+            return self._astar_fallback(graph, source_id, dest_id, dynamic_weights)
 
         try:
             from engine.route_env import McsRouteEnv
@@ -120,17 +120,27 @@ class PpoAgent:
 
         except Exception as e:
             logger.error(f"PPO 추론 오류: {e} → A* 폴백")
-            return self._astar_fallback(graph, source_id, dest_id)
+            return self._astar_fallback(graph, source_id, dest_id, dynamic_weights)
 
     def _astar_fallback(
         self,
         graph: nx.DiGraph,
         source_id: str,
         dest_id: str,
+        dynamic_weights: Optional[Dict[str, float]] = None,
     ) -> Tuple[List[str], float, float]:
-        """PPO 미사용 시 A* 폴백 (confidence=0.0)"""
-        from engine.astar import run_astar
-        path, cost = run_astar(graph, source_id, dest_id)
+        """
+        PPO 미사용 시 폴백 (confidence=0.0)
+
+        dynamicWeights가 있으면 혼잡 반영 A*를 사용하여 AI 경로를 차별화.
+        dynamicWeights가 없으면 일반 A*와 동일하므로 경로 차이 없음.
+        """
+        if dynamic_weights:
+            from engine.astar import run_astar_congestion
+            path, cost = run_astar_congestion(graph, source_id, dest_id, dynamic_weights)
+        else:
+            from engine.astar import run_astar
+            path, cost = run_astar(graph, source_id, dest_id)
         return path, cost, 0.0
 
 

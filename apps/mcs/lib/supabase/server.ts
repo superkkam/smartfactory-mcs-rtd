@@ -1,5 +1,17 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
+
+/**
+ * RLS를 우회하는 서비스 롤 클라이언트.
+ * Seed API 등 인증 없이 DB에 직접 쓰는 Route Handler에서만 사용.
+ */
+export function createAdminClient() {
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  );
+}
 
 /** 서버 컴포넌트 / Route Handler에서 사용하는 Supabase 클라이언트 */
 export async function createClient() {

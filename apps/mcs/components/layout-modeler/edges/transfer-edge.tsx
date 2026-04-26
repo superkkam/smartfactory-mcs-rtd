@@ -23,6 +23,7 @@ export function TransferEdgeComponent({
   targetPosition,
   data,
   selected,
+  markerStart,
   markerEnd,
 }: EdgeProps<TransferEdge>) {
   const [edgePath, labelX, labelY] = getSmoothStepPath({
@@ -38,7 +39,7 @@ export function TransferEdgeComponent({
   const weight = data?.weight ?? 1;
   const system = data?.system;
 
-  const strokeColor = selected ? '#6366f1' : '#94a3b8';
+  const strokeColor = selected ? '#6366f1' : '#64748b';
 
   return (
     <>
@@ -56,8 +57,9 @@ export function TransferEdgeComponent({
         d={edgePath}
         fill="none"
         stroke={strokeColor}
-        strokeWidth={selected ? 2 : 1.5}
+        strokeWidth={selected ? 2.5 : 1.5}
         strokeDasharray="6,4"
+        markerStart={markerStart}
         markerEnd={markerEnd}
         style={{ pointerEvents: 'none' }}
       />

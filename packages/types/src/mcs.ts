@@ -150,6 +150,19 @@ export interface MacroCommand extends McsBaseEntity {
   state: string;
   /** 우선순위 */
   priority: number;
+  // ─── migration 004: RTD 연동 추적 필드 ───────────────────────
+  /** RTD로 전달한 명령 ID (correlationId 에코용) — null=수동 생성 */
+  rtdCommandId?: string | null;
+  /** DISPATCH_RESULT 메시지의 correlationId — TRANSPORT_COMPLETE 에코 */
+  correlationId?: string | null;
+  /** 명령 생성 출처 ('MANUAL' | 'RTD') */
+  sourceSystem?: string;
+  /** 경로 탐색 알고리즘 ('ASTAR' | 'AI_PPO') */
+  algorithm?: string;
+  /** 출발 장비 ID (equipment_id label) — TRANSPORT_COMPLETE 콜백용 비정규화 */
+  sourceEquipmentId?: string | null;
+  /** 목적 장비 ID (equipment_id label) — TRANSPORT_COMPLETE 콜백용 비정규화 */
+  destEquipmentId?: string | null;
 }
 
 /** 마이크로 반송 명령 (구간 단위) */

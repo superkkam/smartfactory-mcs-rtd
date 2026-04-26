@@ -1,35 +1,64 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Play, Square } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { buildAdjList } from '@/lib/acs/layout-graph';
+import type { Edge, Node } from '@xyflow/react';
 import type { Equipment, EquipmentUnit, Carrier } from '@workspace/types/mcs';
 
-/** AGV 이동 간격 (ms) */
-const MOVE_INTERVAL_MS = 1000;
+/** AGV 이동 간격 (ms) — SPEED_PX_PER_SEC=120 기준 ~240px 엣지 애니메이션 여유 */
+const MOVE_INTERVAL_MS = 2000;
 
 interface QuickDemoProps {
-  equipments: Equipment[];
-  units:      EquipmentUnit[];
-  carriers:   Carrier[];
+  equipments:  Equipment[];
+  units:       EquipmentUnit[];
+  carriers:    Carrier[];
+  layoutEdges: Edge[];
+  layoutNodes: Node[];
 }
 
 /**
  * 퀵 데모 패널
- * - AGV 한 대를 Path / Charge 유닛을 따라 순환 이동
- * - 캐리어를 매 틱마다 AGV 와 같은 Node unit 으로 갱신 → hop event 정상 발생
+ * - AGV 한 대를 전이 관계 그래프를 따라 순환 이동
+ * - pathUnits: 알파벳순 정렬 → 그래프 greedy DFS 걷기로 교체
+ *   → 연속된 두 유닛이 항상 직접 연결 → BFS 길이=2 → framer-motion 부드러운 보간
  * - Supabase Realtime → useLayoutMonitor HopEvent → useCarrierAnimations 보간 표시
  *
  * 전제조건: 레이아웃 모델러에서 AGV + ND/CHG 노드를 포함해 저장(syncLayoutToDb) 되어 있어야 함
  */
-export function QuickDemo({ equipments, units, carriers }: QuickDemoProps) {
+export function QuickDemo({ equipments, units, carriers, layoutEdges, layoutNodes }: QuickDemoProps) {
   const [running, setRunning] = useState(false);
   const [log, setLog]       = useState('');
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const pathUnits = units
-    .filter((u) => u.unitType === 'Node')
-    .sort((a, b) => a.equipmentUnitId.localeCompare(b.equipmentUnitId));
+  // 양방향 인접 리스트 — 순환 경로 생성용 (단방향이면 역주행 불가)
+  const adj = useMemo(
+    () => buildAdjList(layoutEdges, layoutNodes, units, { bidirectional: true }),
+    [layoutEdges, layoutNodes, units],
+  );
+
+  // 전이 관계 그래프를 따라 greedy DFS 걷기 → 연속 유닛이 항상 인접 보장
+  const pathUnits = useMemo(() => {
+    const nodeUnits = units.filter((u) => u.unitType === 'Node');
+    if (nodeUnits.length === 0) return [];
+
+    const unitMap = new Map(nodeUnits.map(u => [u.id, u]));
+    const start   = nodeUnits[0];
+    const visited = new Set<string>([start.id]);
+    const path    = [start];
+    let current   = start.id;
+
+    while (true) {
+      const neighbors = adj.get(current) ?? [];
+      const next = neighbors.find(n => !visited.has(n) && unitMap.has(n));
+      if (!next) break;
+      visited.add(next);
+      path.push(unitMap.get(next)!);
+      current = next;
+    }
+    return path;
+  }, [units, adj]);
 
   const agv = equipments.find((e) => e.equipmentType === 'AGV');
 
@@ -88,6 +117,18 @@ export function QuickDemo({ equipments, units, carriers }: QuickDemoProps) {
         .eq('id', carrierId);
     }
 
+    // ── 캐리어를 AGV에 탑재 상태로 설정 ────────────────────────────────────────
+    // current_equipment_id = AGV ID, state = 'Transferring'
+    // → useCarrierAnimations 가 parentAgv 를 식별하여 AGV 위에 캐리어 렌더링
+    await supabase
+      .from('mcs_carrier')
+      .update({
+        state:                'Transferring',
+        current_equipment_id: agv.id,
+        location_id:          pathUnits[0].id,
+      })
+      .eq('id', carrierId);
+
     setRunning(true);
     setLog(`데모 시작 ▶  AGV=${agv.equipmentId}  경유=${pathUnits.length}노드`);
 
@@ -96,31 +137,35 @@ export function QuickDemo({ equipments, units, carriers }: QuickDemoProps) {
       idx = (idx + 1) % pathUnits.length;
       const unit = pathUnits[idx];
 
-      // AGV 와 캐리어를 동일한 Node unit 으로 이동
-      // → useLayoutMonitor 가 각각의 hop event 를 emit
-      // → useCarrierAnimations 가 Node→RF 위치 계산 후 보간 애니메이션
-      await Promise.all([
-        supabase
-          .from('mcs_equipment')
-          .update({ location_id: unit.id })
-          .eq('id', agv.id),
-        supabase
-          .from('mcs_carrier')
-          .update({ location_id: unit.id })
-          .eq('id', carrierId),
-      ]);
+      // AGV 위치만 업데이트 → useLayoutMonitor 가 equipment hop event emit
+      // → useCarrierAnimations 가 AGV 를 전이 관계 엣지 경로로 보간
+      // 캐리어는 current_equipment_id(AGV)를 따라 자동 렌더링되므로 별도 업데이트 불필요
+      await supabase
+        .from('mcs_equipment')
+        .update({ location_id: unit.id })
+        .eq('id', agv.id);
 
       setLog(`이동 → ${unit.equipmentUnitId}  (${idx + 1} / ${pathUnits.length})`);
     }, MOVE_INTERVAL_MS);
   };
 
-  const handleStop = () => {
+  const handleStop = async () => {
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
     setRunning(false);
     setLog('데모 정지');
+
+    // 캐리어 상태 원복 (Transferring → Installed)
+    const supabase = createClient();
+    const existing = carriers[0];
+    if (existing) {
+      await supabase
+        .from('mcs_carrier')
+        .update({ state: 'Installed', current_equipment_id: null })
+        .eq('id', existing.id);
+    }
   };
 
   return (
