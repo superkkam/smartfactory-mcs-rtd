@@ -329,11 +329,16 @@ export async function runRuleEngine(
     }
 
     // 점프로 건너뛴 시퀀스를 executed=false 로 기록 (UI 가시성)
+    // 건너뛴 시퀀스의 prevResults 를 현재 결과로 상속 —
+    // 이후 시퀀스가 건너뛴 시퀀스를 filterSequence 로 참조할 때 체인이 끊기지 않도록.
+    const inheritedRows = prevResults.get(seq) ?? finalRows;
     for (let skipIdx = currentIdx + 1; skipIdx < nextIdx; skipIdx++) {
       const skipped = relations[skipIdx];
+      const skippedSeq = skipped.sequence as number;
       const skippedDef = defMap.get(skipped.rule_id as string);
+      prevResults.set(skippedSeq, inheritedRows);
       seqResults.push({
-        sequence: skipped.sequence as number,
+        sequence: skippedSeq,
         ruleId:   skipped.rule_id as string,
         ruleName: skippedDef?.ruleName ?? (skipped.rule_id as string),
         ruleType: skippedDef?.ruleType ?? 'Data',
