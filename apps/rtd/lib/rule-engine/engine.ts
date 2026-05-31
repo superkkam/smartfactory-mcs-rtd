@@ -62,6 +62,8 @@ export interface EngineResult {
   selectedLotId: string | null;
   /** 목적지 설비 ID (mcs_equipment.equipment_id) */
   destEquipmentId: string | null;
+  /** 출발 유닛 ID (mcs_carrier.location_id — 캐리어 정밀 위치 UUID) */
+  sourceUnitId: string | null;
   /** 적용된 룰 그룹 ID */
   ruleGroupId: string;
   /** 시퀀스별 실행 결과 */
@@ -307,6 +309,7 @@ export async function runRuleEngine(
         reason:           `시퀀스 #${seq} (${seqResult.ruleName}): 필수 룰 결과 0건 → REJECTED`,
         selectedLotId:    null,
         destEquipmentId:  null,
+        sourceUnitId:     null,
         ruleGroupId,
         sequenceResults:  seqResults,
         totalDuration:    Math.round(performance.now() - totalStart),
@@ -352,26 +355,37 @@ export async function runRuleEngine(
   }
 
   // ── 4. 최종 디스패칭 결과 산출 ──────────────────────────────
-  // finalRows 의 첫 번째 row 에서 lot_id / equipment_id 추출
   const topRow = finalRows[0] ?? {};
   const selectedLotId: string | null =
     (topRow.lot_id as string) || (topRow.carrier_id as string) || null;
+  // dest_equipment_id 만 명시적 목적지로 인정.
+  // equipment_id 는 캐리어의 현재 설비(출발지)이므로 목적지로 쓰지 않음.
   const destEquipmentId: string | null =
-    (topRow.equipment_id as string) || (topRow.dest_equipment_id as string) || null;
+    (topRow.dest_equipment_id as string) || null;
+  // location_id = mcs_carrier.location_id (캐리어 정밀 위치 유닛 UUID) → 출발 유닛
+  const sourceUnitId: string | null =
+    (topRow.location_id as string) || null;
 
   // ── 5. rule_running_result 기록 (dryRun=false 시) ───────────
   if (!dryRun && seqResults.length > 0) {
     const now = new Date().toISOString();
+    const lastSeq = seqResults[seqResults.length - 1]?.sequence;
+    // SQL에 dest_equipment_id 없으면 요청 장비(equipmentId)를 목적지 표시용으로 사용
+    const recordedDest = destEquipmentId ?? equipmentId ?? null;
     const inserts = seqResults
       .filter((r) => r.executed && r.count !== null)
       .map((r) => ({
-        lot_id:         selectedLotId ?? '',
-        rule_id:        r.ruleId,
-        sequence:       r.sequence,
-        count:          r.count ?? 0,
-        start_time:     now,
-        end_time:       new Date(Date.now() + r.duration).toISOString(),
-        is_dispatching: r.sequence === seqResults[seqResults.length - 1]?.sequence ? 'Y' : 'N',
+        uuid:              crypto.randomUUID(),
+        lot_id:            selectedLotId ?? '',
+        rule_id:           r.ruleId,
+        rule_name:         r.ruleName,
+        sequence:          r.sequence,
+        count:             r.count ?? 0,
+        start_time:        now,
+        end_time:          new Date(Date.now() + r.duration).toISOString(),
+        is_dispatching:    r.sequence === lastSeq ? 'Y' : 'N',
+        dest_equipment_id: r.sequence === lastSeq ? recordedDest : null,
+        result_rows:       r.rows ? r.rows.slice(0, 20) : null,
       }));
 
     if (inserts.length > 0) {
@@ -383,6 +397,7 @@ export async function runRuleEngine(
     success:         true,
     selectedLotId,
     destEquipmentId,
+    sourceUnitId,
     ruleGroupId,
     sequenceResults: seqResults,
     totalDuration:   Math.round(performance.now() - totalStart),
@@ -397,6 +412,7 @@ function makeError(ruleGroupId: string, reason: string, elapsed: number): Engine
     reason,
     selectedLotId:   null,
     destEquipmentId: null,
+    sourceUnitId:    null,
     ruleGroupId,
     sequenceResults: [],
     totalDuration:   Math.round(elapsed),

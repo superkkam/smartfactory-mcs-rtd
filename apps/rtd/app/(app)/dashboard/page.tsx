@@ -1,3 +1,5 @@
+'use client';
+
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -9,40 +11,24 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Loader2 } from 'lucide-react';
+import { useRuleGroups } from '@/lib/api/rule-groups';
+import { useRuleRunningResults } from '@/lib/api/rule-running-results';
 import {
-  DUMMY_DAILY_STATS,
-  DUMMY_CLASS_STATS,
-} from '@/lib/dummy';
-import { createClient } from '@/lib/supabase/server';
+  DashboardSummaryCards,
+  DashboardDailyChart,
+  DashboardClassChart,
+} from '@/components/dashboard/dashboard-stats';
 
-export default async function DashboardPage() {
-  const supabase = await createClient();
+export default function DashboardPage() {
+  const { data: groups = [], isLoading: groupsLoading } = useRuleGroups();
+  const { data: recentResults = [], isLoading: resultsLoading } = useRuleRunningResults({});
 
-  // 룰 그룹 수 조회
-  const { data: groupRows } = await supabase
-    .from('rule_group')
-    .select('is_usable');
-  const totalGroups = groupRows?.length ?? 0;
-  const activeGroups = groupRows?.filter((g) => g.is_usable === 'Y').length ?? 0;
+  const totalGroups  = groups.length;
+  const activeGroups = groups.filter((g) => g.isUsable === 'Y').length;
 
-  // 최근 실행 로그 5건 조회
-  const { data: recentRows } = await supabase
-    .from('rule_running_result')
-    .select('uuid, lot_id, rule_id, sequence, count, is_dispatching, start_time')
-    .order('start_time', { ascending: false })
-    .limit(5);
-  const recentResults = (recentRows ?? []).map((r) => ({
-    uuid:          r.uuid as string,
-    lotId:         r.lot_id as string,
-    ruleId:        r.rule_id as string,
-    sequence:      r.sequence as number,
-    count:         r.count as number,
-    isDispatching: r.is_dispatching as string,
-    startTime:     r.start_time as string,
-  }));
-
-  const todayCount = recentResults.length;
-  const dispatchedCount = recentResults.filter((r) => r.isDispatching === 'Y').length;
+  // 최근 5건만 표시
+  const recentFive = recentResults.slice(0, 5);
 
   return (
     <div className="space-y-6">
@@ -51,85 +37,30 @@ export default async function DashboardPage() {
         <p className="text-sm text-gray-500 mt-1">RTD 룰 실행 현황 요약</p>
       </div>
 
-      {/* 요약 카드 */}
+      {/* 요약 카드 3열 */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        {/* 활성 룰 그룹 */}
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-gray-500">활성 룰 그룹</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-gray-900">{activeGroups}</p>
+            {groupsLoading
+              ? <Loader2 className="h-6 w-6 animate-spin text-gray-300" />
+              : <p className="text-3xl font-bold text-gray-900">{activeGroups}</p>
+            }
             <p className="text-xs text-gray-400 mt-1">전체 {totalGroups}개 중</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500">오늘 실행 건수</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-gray-900">{todayCount}</p>
-            <p className="text-xs text-gray-400 mt-1">디스패칭 적용: {dispatchedCount}건</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500">평균 소요시간</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-gray-900">65ms</p>
-            <p className="text-xs text-gray-400 mt-1">최근 7일 평균</p>
-          </CardContent>
-        </Card>
+        {/* 오늘 실행 건수 + 평균 소요시간 — 실데이터 */}
+        <DashboardSummaryCards />
       </div>
 
+      {/* 차트 2열 — 실데이터 */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* 일별 실행 건수 바 차트 (간이) */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">일별 룰 실행 건수</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {DUMMY_DAILY_STATS.map((d) => (
-                <div key={d.date} className="flex items-center gap-3">
-                  <span className="w-12 text-xs text-gray-500">{d.date}</span>
-                  <div className="flex-1 h-5 bg-gray-100 rounded overflow-hidden">
-                    <div
-                      className="h-full bg-blue-500 rounded"
-                      style={{ width: `${(d.count / 220) * 100}%` }}
-                    />
-                  </div>
-                  <span className="w-8 text-xs text-right text-gray-700">{d.count}</span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* 룰 클래스별 평균 소요시간 */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">룰 클래스별 평균 소요시간 (ms)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {DUMMY_CLASS_STATS.map((s) => (
-                <div key={s.className} className="flex items-center gap-3">
-                  <span className="w-24 text-xs text-gray-500">{s.className}</span>
-                  <div className="flex-1 h-5 bg-gray-100 rounded overflow-hidden">
-                    <div
-                      className="h-full bg-emerald-500 rounded"
-                      style={{ width: `${(s.avgDuration / 150) * 100}%` }}
-                    />
-                  </div>
-                  <span className="w-10 text-xs text-right text-gray-700">{s.avgDuration}ms</span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+        <DashboardDailyChart />
+        <DashboardClassChart />
       </div>
 
       {/* 최근 실행 로그 */}
@@ -153,7 +84,19 @@ export default async function DashboardPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {recentResults.map((r) => (
+              {resultsLoading ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="py-8 text-center">
+                    <Loader2 className="h-5 w-5 animate-spin mx-auto text-gray-400" />
+                  </TableCell>
+                </TableRow>
+              ) : recentFive.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="py-8 text-center text-sm text-gray-400">
+                    실행 로그가 없습니다
+                  </TableCell>
+                </TableRow>
+              ) : recentFive.map((r) => (
                 <TableRow key={r.uuid}>
                   <TableCell className="font-mono text-sm">{r.lotId}</TableCell>
                   <TableCell className="text-sm">{r.ruleId}</TableCell>

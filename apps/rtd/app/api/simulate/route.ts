@@ -195,6 +195,21 @@ export async function POST(request: NextRequest) {
         message: engineResult.reason,
       });
     }
+
+    // 디스패칭 결과를 응답에 포함
+    const lastSeqResult = engineResult.sequenceResults.at(-1);
+    const dispatchRow = lastSeqResult?.rows?.[0] ?? null;
+
+    const response: SimulationResponse = {
+      valid: !hasErrors,
+      validationIssues,
+      results,
+      totalDuration: Math.round(performance.now() - totalStart),
+      selectedLotId:   engineResult.selectedLotId,
+      destEquipmentId: engineResult.destEquipmentId,
+      dispatchRow,
+    };
+    return NextResponse.json(response);
   } else {
     // 구조 오류 있을 때는 기존 방식으로 메타만 반환
     const { data: defRows } = await supabase

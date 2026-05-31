@@ -11,14 +11,17 @@ const CACHE_LIMIT = 200;  // Realtime 수신 시 메모리 상한
 /** DB row(snake_case) → TypeScript 타입(camelCase) 변환 */
 function toRuleRunningResult(row: Record<string, unknown>): RuleRunningResult {
   return {
-    uuid:          row.uuid as string,
-    lotId:         row.lot_id as string,
-    ruleId:        row.rule_id as string,
-    sequence:      row.sequence as number,
-    count:         row.count as number,
-    startTime:     row.start_time as string,
-    endTime:       row.end_time as string,
-    isDispatching: row.is_dispatching as string,
+    uuid:             row.uuid as string,
+    lotId:            row.lot_id as string,
+    ruleId:           row.rule_id as string,
+    ruleName:         (row.rule_name as string | null) ?? null,
+    sequence:         row.sequence as number,
+    count:            row.count as number,
+    startTime:        row.start_time as string,
+    endTime:          row.end_time as string,
+    isDispatching:    row.is_dispatching as string,
+    destEquipmentId:  (row.dest_equipment_id as string | null) ?? null,
+    resultRows:       (row.result_rows as Record<string, unknown>[] | null) ?? null,
   };
 }
 

@@ -10,7 +10,7 @@ import {
   type DispatchResultBody,
 } from '@workspace/types/messages';
 import { createMessage, sendMessage } from '@workspace/types/message-client';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/server';
 import { runRuleEngine } from '@/lib/rule-engine/engine';
 
 /**
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
   }
 
   const { messageType, correlationId, siteId } = msg.header;
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   // ── 메시지 유형별 처리 ────────────────────────────────────────
   switch (messageType) {
@@ -60,7 +60,8 @@ export async function POST(request: NextRequest) {
           status:          engineResult.success ? 'ACCEPTED' : 'REJECTED',
           ruleGroupId:     engineResult.ruleGroupId,
           selectedLotId:   engineResult.selectedLotId,
-          destEquipmentId: engineResult.destEquipmentId,
+          // SQL에 dest_equipment_id 없으면 요청 포트를 목적지로 표시
+          destEquipmentId: engineResult.destEquipmentId ?? body.equipmentId,
           reason:          engineResult.reason ?? null,
         },
         { siteId, correlationId }
@@ -69,8 +70,9 @@ export async function POST(request: NextRequest) {
       await sendMessage(process.env.MES_API_URL, ack);
 
       // RTD → MCS: DISPATCH_RESULT 전송 (MCS_API_URL 미설정 시 no-op)
-      void emitDispatchResult(engineResult, {
-        sourceEquipmentId: body.equipmentId,
+      void emitDispatchResult(supabase, engineResult, {
+        requestingUnitId:  body.equipmentId,
+        sourceUnitId:      engineResult.sourceUnitId,
         lotId:             body.lotId,
         carrierId:         body.carrierId,
         priority:          body.priority,
@@ -104,8 +106,9 @@ export async function POST(request: NextRequest) {
 
       await sendMessage(process.env.MES_API_URL, ack);
 
-      void emitDispatchResult(engineResult, {
-        sourceEquipmentId: body.equipmentId,
+      void emitDispatchResult(supabase, engineResult, {
+        requestingUnitId:  body.equipmentId,
+        sourceUnitId:      engineResult.sourceUnitId,
         ruleGroupId:       engineResult.ruleGroupId,
       });
 
@@ -141,8 +144,9 @@ export async function POST(request: NextRequest) {
 
       await sendMessage(process.env.MES_API_URL, ack);
 
-      void emitDispatchResult(engineResult, {
-        sourceEquipmentId: body.sourceEquipmentId ?? '',
+      void emitDispatchResult(supabase, engineResult, {
+        requestingUnitId:  body.destEquipmentId ?? body.sourceEquipmentId ?? '',
+        sourceUnitId:      engineResult.sourceUnitId,
         lotId:             body.lotId,
         carrierId:         body.carrierId,
         priority:          body.priority,
@@ -211,7 +215,7 @@ interface DispatchOptions {
 }
 
 async function dispatchByEquipmentEvent(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: ReturnType<typeof createAdminClient>,
   opts: DispatchOptions
 ) {
   const { equipmentId, eventType, lotId, carrierId } = opts;
@@ -236,6 +240,7 @@ async function dispatchByEquipmentEvent(
       ruleGroupId:     '',
       selectedLotId:   null,
       destEquipmentId: opts.overrideDest ?? null,
+      sourceUnitId:    null,
       reason:          '룰 그룹 매핑 없음 — 단독 모드',
     };
   }
@@ -253,7 +258,10 @@ async function dispatchByEquipmentEvent(
 // ─── RTD → MCS DISPATCH_RESULT 송신 ──────────────────────────────────
 
 interface EmitOptions {
-  sourceEquipmentId: string;
+  /** LoadRequest 발생 포트 (예: "PROC-M1-IN") — 이것이 캐리어의 목적지 */
+  requestingUnitId:  string;
+  /** 캐리어 현재 위치 유닛 UUID (mcs_carrier.location_id) */
+  sourceUnitId?:     string | null;
   lotId?:            string | null;
   carrierId?:        string;
   priority?:         number;
@@ -261,11 +269,36 @@ interface EmitOptions {
 }
 
 async function emitDispatchResult(
+  supabase: ReturnType<typeof createAdminClient>,
   engineResult: Awaited<ReturnType<typeof dispatchByEquipmentEvent>>,
   opts: EmitOptions,
 ) {
   const mcsUrl = process.env.MCS_API_URL;
-  if (!mcsUrl || !engineResult.success || !engineResult.destEquipmentId) return;
+  if (!mcsUrl || !engineResult.success) return;
+
+  // requestingUnitId(PROC-M1-IN) → 상위 equipment_id(PROC-M1) 변환 (MCS 레이아웃 조회용)
+  let resolvedDestEquipmentId = opts.requestingUnitId;
+  const { data: unitRow } = await supabase
+    .from('mcs_equipment_unit')
+    .select('equipment_id')
+    .eq('equipment_unit_id', opts.requestingUnitId)
+    .maybeSingle();
+  if (unitRow?.equipment_id) {
+    const { data: eqRow } = await supabase
+      .from('mcs_equipment')
+      .select('equipment_id')
+      .eq('id', unitRow.equipment_id)
+      .maybeSingle();
+    if (eqRow?.equipment_id) resolvedDestEquipmentId = eqRow.equipment_id;
+  }
+
+  // 목적지:
+  // 1. 엔진이 명시적으로 dest_equipment_id 를 반환한 경우 그것 사용
+  // 2. 없으면 LoadRequest 발생 설비(= requestingUnitId 의 상위 설비)가 목적지
+  const finalDestEquipmentId = engineResult.destEquipmentId ?? resolvedDestEquipmentId;
+  const finalDestUnitId      = engineResult.destEquipmentId ? undefined : opts.requestingUnitId;
+
+  if (!finalDestEquipmentId) return;
 
   const body: DispatchResultBody = {
     ruleGroupId:  engineResult.ruleGroupId,
@@ -275,8 +308,10 @@ async function emitDispatchResult(
         lotId:             opts.lotId ?? engineResult.selectedLotId ?? 'UNKNOWN',
         carrierId:         opts.carrierId,
         priority:          opts.priority ?? 50,
-        sourceEquipmentId: opts.sourceEquipmentId,
-        destEquipmentId:   engineResult.destEquipmentId,
+        sourceEquipmentId: resolvedDestEquipmentId,  // 같은 레이아웃 → layout_id 조회용
+        sourceUnitId:      opts.sourceUnitId ?? undefined,   // 캐리어 실제 위치 UUID
+        destEquipmentId:   finalDestEquipmentId,
+        destUnitId:        finalDestUnitId,
       },
     ],
     executionSummary: {
@@ -292,6 +327,6 @@ async function emitDispatchResult(
   if (!result.ok) {
     console.warn(`[RTD] DISPATCH_RESULT 전송 실패: ${result.error ?? result.status}`);
   } else {
-    console.log(`[RTD] DISPATCH_RESULT 전송 완료 → MCS | dest=${engineResult.destEquipmentId}`);
+    console.log(`[RTD] DISPATCH_RESULT 전송 완료 → MCS | src=${opts.sourceUnitId ?? '?'} dest=${finalDestEquipmentId}/${finalDestUnitId ?? ''}`);
   }
 }

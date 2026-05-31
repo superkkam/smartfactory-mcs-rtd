@@ -14,9 +14,10 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+// Badge는 룰 그룹 테이블에서 사용
 import { RuleGroupFormDialog } from '@/components/rule-groups/rule-group-form-dialog';
+import { EquipmentMappingPanel } from '@/components/rule-groups/equipment-mapping-panel';
 import { useRuleGroups, useDeleteRuleGroup } from '@/lib/api/rule-groups';
-import { useRuleObjects } from '@/lib/api/rule-objects';
 import type { RuleGroup } from '@workspace/types/rtd';
 
 export default function RuleGroupsPage() {
@@ -25,7 +26,6 @@ export default function RuleGroupsPage() {
   const [selectedGroupId, setSelectedGroupId] = useState<string>('');
 
   const { data: ruleGroups = [], isLoading } = useRuleGroups();
-  const { data: mappings = [] } = useRuleObjects(selectedGroupId);
   const deleteMutation = useDeleteRuleGroup();
 
   /** 로드 완료 후 첫 항목 자동 선택 */
@@ -206,34 +206,9 @@ export default function RuleGroupsPage() {
             </Card>
           )}
 
-          {/* 장비-이벤트 매핑 */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">장비-이벤트 매핑</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {mappings.length === 0 ? (
-                <p className="text-sm text-gray-400">매핑된 장비 없음</p>
-              ) : (
-                <div className="space-y-2">
-                  {mappings.map((m) => (
-                    <div
-                      key={`${m.ruleObjectId}-${m.ruleEventId}`}
-                      className="flex items-center justify-between rounded-md border border-gray-100 bg-gray-50 px-3 py-2"
-                    >
-                      <div>
-                        <p className="text-xs font-mono">{m.ruleObjectId}</p>
-                        <p className="text-xs text-gray-400">{m.ruleEventId}</p>
-                      </div>
-                      <Badge variant={m.isUsable === 'Y' ? 'default' : 'secondary'} className="text-xs">
-                        {m.isUsable === 'Y' ? '활성' : '비활성'}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          {currentGroup && (
+            <EquipmentMappingPanel ruleGroupId={currentGroup.ruleGroupId} />
+          )}
         </div>
       </div>
 

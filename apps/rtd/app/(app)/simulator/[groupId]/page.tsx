@@ -4,7 +4,7 @@ import { use, useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import {
   ArrowLeft, Play, CheckCircle, AlertCircle, AlertTriangle,
-  ChevronDown, ChevronRight, Eye,
+  ChevronDown, ChevronRight, Eye, ArrowRight, Package, MapPin,
 } from 'lucide-react';
 import {
   ReactFlow,
@@ -65,6 +65,9 @@ export default function SimulatorPage({
   const [rawResponse, setRawResponse] = useState<string>('');
   const [selectedSeq, setSelectedSeq] = useState<number | null>(null);
   const [diagOpen, setDiagOpen] = useState(false);
+  const [selectedLotId, setSelectedLotId] = useState<string | null>(null);
+  const [destEquipmentId, setDestEquipmentId] = useState<string | null>(null);
+  const [dispatchRow, setDispatchRow] = useState<Record<string, unknown> | null>(null);
 
   // ── React Flow 상태 ───────────────────────────────────────────────
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
@@ -148,6 +151,9 @@ export default function SimulatorPage({
     setResults([]);
     setValidationIssues([]);
     setSelectedSeq(null);
+    setSelectedLotId(null);
+    setDestEquipmentId(null);
+    setDispatchRow(null);
 
     try {
       const res = await fetch('/api/simulate', {
@@ -170,6 +176,9 @@ export default function SimulatorPage({
       setValidationIssues(data.validationIssues);
       setValid(data.valid);
       setTotalDuration(data.totalDuration);
+      setSelectedLotId(data.selectedLotId ?? null);
+      setDestEquipmentId(data.destEquipmentId ?? null);
+      setDispatchRow(data.dispatchRow ?? null);
     } catch (e) {
       setError(e instanceof Error ? e.message : '알 수 없는 오류');
     } finally {
@@ -396,6 +405,66 @@ export default function SimulatorPage({
                 queryPreview={selectedResult.queryPreview}
                 count={selectedResult.count}
               />
+            </div>
+          )}
+
+          {/* ── 디스패칭 결과 패널 ── */}
+          {hasRun && (selectedLotId || destEquipmentId) && (
+            <div className="shrink-0 rounded-lg border border-blue-200 bg-blue-50 p-4">
+              <p className="mb-3 text-sm font-semibold text-blue-800">디스패칭 결과</p>
+              <div className="flex items-center gap-3">
+                {/* 선택된 캐리어 */}
+                <div className="flex items-center gap-2 rounded-md bg-white border border-blue-200 px-3 py-2 min-w-0">
+                  <Package className="h-4 w-4 text-blue-500 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-xs text-gray-400">선택 캐리어 / Lot</p>
+                    <p className="text-sm font-mono font-medium text-gray-800 truncate">
+                      {selectedLotId ?? '—'}
+                    </p>
+                  </div>
+                </div>
+
+                <ArrowRight className="h-5 w-5 text-blue-400 shrink-0" />
+
+                {/* 목적지 */}
+                <div className="flex items-center gap-2 rounded-md bg-white border border-blue-200 px-3 py-2 min-w-0">
+                  <MapPin className="h-4 w-4 text-emerald-500 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-xs text-gray-400">목적지 설비</p>
+                    <p className="text-sm font-mono font-medium text-gray-800 truncate">
+                      {destEquipmentId ?? '—'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* 디스패칭 row 상세 */}
+              {dispatchRow && Object.keys(dispatchRow).length > 0 && (
+                <div className="mt-3 overflow-x-auto rounded border border-blue-100 bg-white">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-blue-50 text-blue-700">
+                        {Object.keys(dispatchRow).map((col) => (
+                          <th key={col} className="px-3 py-1.5 text-left font-medium whitespace-nowrap">{col}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        {Object.values(dispatchRow).map((val, i) => (
+                          <td key={i} className="px-3 py-1.5 font-mono text-gray-700 whitespace-nowrap max-w-[200px] truncate">
+                            {val === null ? <span className="text-gray-300 italic">null</span> : String(val)}
+                          </td>
+                        ))}
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {!selectedLotId && !destEquipmentId && (
+                <p className="text-xs text-blue-500 mt-2">디스패칭 대상 없음 (결과 row에 lot_id / equipment_id 없음)</p>
+              )}
             </div>
           )}
 

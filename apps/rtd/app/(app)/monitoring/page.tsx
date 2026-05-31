@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
-import { Loader2, Search, Wifi, WifiOff } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Loader2, Search, Wifi, WifiOff, ArrowRight, Package, MapPin, ChevronDown, ChevronRight } from 'lucide-react';
+import { useMcsHealth } from '@/lib/api/mcs-health';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -18,11 +19,241 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useRuleRunningResults } from '@/lib/api/rule-running-results';
 import { useRunningStats } from '@/lib/api/running-stats';
 import { useDebouncedValue } from '@/lib/hooks/use-debounced-value';
+import type { RuleRunningResult } from '@workspace/types/rtd';
+
+function SequenceRowsTable({ rows }: { rows: Record<string, unknown>[] }) {
+  const [page, setPage] = useState(0);
+  const PAGE = 5;
+  if (rows.length === 0) return null;
+  const cols = Object.keys(rows[0]);
+  const totalPages = Math.ceil(rows.length / PAGE);
+  const pageRows = rows.slice(page * PAGE, (page + 1) * PAGE);
+
+  return (
+    <div className="mt-2 overflow-x-auto rounded border border-gray-100">
+      <table className="w-full text-xs">
+        <thead>
+          <tr className="bg-gray-50 text-gray-600">
+            {cols.map((c) => (
+              <th key={c} className="px-2.5 py-1.5 text-left font-medium whitespace-nowrap">{c}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {pageRows.map((r, i) => (
+            <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
+              {cols.map((c) => (
+                <td key={c} className="px-2.5 py-1.5 font-mono text-gray-700 whitespace-nowrap max-w-[180px] truncate">
+                  {r[c] === null || r[c] === undefined
+                    ? <span className="text-gray-300 italic">null</span>
+                    : String(r[c])}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between border-t border-gray-100 px-3 py-1">
+          <span className="text-xs text-gray-400">총 {rows.length}건</span>
+          <div className="flex items-center gap-1">
+            <button
+              className="rounded px-2 py-0.5 text-xs text-blue-600 hover:bg-blue-50 disabled:opacity-40"
+              disabled={page === 0}
+              onClick={() => setPage((p) => p - 1)}
+            >‹</button>
+            <span className="text-xs text-gray-500">{page + 1}/{totalPages}</span>
+            <button
+              className="rounded px-2 py-0.5 text-xs text-blue-600 hover:bg-blue-50 disabled:opacity-40"
+              disabled={page >= totalPages - 1}
+              onClick={() => setPage((p) => p + 1)}
+            >›</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** lot_id + 1분 이내 시간 기준으로 동일 디스패칭 이벤트로 묶음 */
+interface DispatchEvent {
+  key: string;
+  lotId: string;
+  destEquipmentId: string | null;
+  startTime: string;
+  sequences: RuleRunningResult[];
+  isDispatching: boolean;
+}
+
+function groupToEvents(rows: RuleRunningResult[]): DispatchEvent[] {
+  const events: DispatchEvent[] = [];
+  const sorted = [...rows].sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+  for (const row of sorted) {
+    const t = new Date(row.startTime).getTime();
+    // 마지막 추가된 row의 시간 기준 5초 이내 → 같은 디스패칭 실행으로 간주
+    // (60초 기준이면 같은 lot에 대해 여러 번 실행 시 합쳐져 중복 표시됨)
+    const existing = events.find((e) => {
+      if (e.lotId !== row.lotId) return false;
+      const lastSeqTime = new Date(e.sequences[e.sequences.length - 1].startTime).getTime();
+      return Math.abs(lastSeqTime - t) < 5_000;
+    });
+    if (existing) {
+      // uuid 중복 방지
+      if (!existing.sequences.some((s) => s.uuid === row.uuid)) {
+        existing.sequences.push(row);
+      }
+      if (row.isDispatching === 'Y') {
+        existing.isDispatching = true;
+        existing.destEquipmentId = row.destEquipmentId ?? existing.destEquipmentId;
+      }
+    } else {
+      events.push({
+        key: row.uuid,
+        lotId: row.lotId,
+        destEquipmentId: row.destEquipmentId ?? null,
+        startTime: row.startTime,
+        sequences: [row],
+        isDispatching: row.isDispatching === 'Y',
+      });
+    }
+  }
+
+  // 최신순 정렬
+  return events.sort((a, b) => b.startTime.localeCompare(a.startTime));
+}
+
+function SeqDetail({
+  seq,
+  dur,
+  isDispatching,
+}: {
+  seq: RuleRunningResult;
+  dur: number;
+  isDispatching: boolean;
+}) {
+  const [rowsOpen, setRowsOpen] = useState(false);
+  const hasRows = seq.resultRows && seq.resultRows.length > 0;
+
+  return (
+    <div className={`px-4 py-3 ${isDispatching ? 'bg-blue-50/40' : ''}`}>
+      {/* 시퀀스 헤더 */}
+      <div className="flex items-center gap-3">
+        <span className="text-xs font-bold text-gray-400 w-8">#{seq.sequence}</span>
+
+        {/* 블록 이름 (없으면 ruleId 축약) */}
+        <span className="text-sm font-medium text-gray-800 flex-1">
+          {seq.ruleName ?? seq.ruleId.slice(0, 8) + '…'}
+        </span>
+
+        <span className="text-xs text-gray-500">{seq.count}건</span>
+        <span className="text-xs text-gray-400">{dur}ms</span>
+
+        {isDispatching ? (
+          <div className="flex items-center gap-1.5">
+            <Badge variant="default" className="text-xs">디스패칭</Badge>
+            {seq.destEquipmentId && (
+              <span className="text-xs text-emerald-600 font-mono">→ {seq.destEquipmentId}</span>
+            )}
+          </div>
+        ) : (
+          <Badge variant="secondary" className="text-xs">통과</Badge>
+        )}
+
+        {hasRows && (
+          <button
+            className="flex items-center gap-1 text-xs text-blue-500 hover:text-blue-700"
+            onClick={() => setRowsOpen((v) => !v)}
+          >
+            {rowsOpen
+              ? <><ChevronDown className="h-3 w-3" /> 데이터 닫기</>
+              : <><ChevronRight className="h-3 w-3" /> 데이터 보기</>
+            }
+          </button>
+        )}
+      </div>
+
+      {/* 결과 rows */}
+      {rowsOpen && hasRows && (
+        <SequenceRowsTable rows={seq.resultRows!} />
+      )}
+    </div>
+  );
+}
+
+function DispatchEventCard({ event }: { event: DispatchEvent }) {
+  const [open, setOpen] = useState(false);
+  const duration =
+    event.sequences.length > 0
+      ? new Date(event.sequences[event.sequences.length - 1].endTime).getTime() -
+        new Date(event.sequences[0].startTime).getTime()
+      : 0;
+
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
+      {/* 이벤트 헤더 — 디스패칭 결과 요약 */}
+      <button
+        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 text-left"
+        onClick={() => setOpen((v) => !v)}
+      >
+        {open ? <ChevronDown className="h-4 w-4 text-gray-400 shrink-0" /> : <ChevronRight className="h-4 w-4 text-gray-400 shrink-0" />}
+
+        {/* 캐리어 → 목적지 */}
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 rounded-md bg-blue-50 border border-blue-200 px-2.5 py-1">
+            <Package className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+            <span className="text-xs font-mono font-medium text-blue-800 truncate max-w-[140px]">
+              {event.lotId || '—'}
+            </span>
+          </div>
+
+          <ArrowRight className="h-4 w-4 text-gray-400 shrink-0" />
+
+          <div className="flex items-center gap-1.5 rounded-md bg-emerald-50 border border-emerald-200 px-2.5 py-1">
+            <MapPin className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+            <span className="text-xs font-mono font-medium text-emerald-800 truncate max-w-[140px]">
+              {event.destEquipmentId || '목적지 없음'}
+            </span>
+          </div>
+
+          <Badge
+            variant={event.isDispatching ? 'default' : 'secondary'}
+            className="shrink-0 text-xs"
+          >
+            {event.isDispatching ? '디스패칭' : '미적용'}
+          </Badge>
+        </div>
+
+        {/* 메타 */}
+        <div className="flex items-center gap-3 text-xs text-gray-400 shrink-0">
+          <span>{event.sequences.length}개 시퀀스</span>
+          <span>{duration}ms</span>
+          <span>{new Date(event.startTime).toLocaleTimeString('ko-KR')}</span>
+        </div>
+      </button>
+
+      {/* 시퀀스별 상세 */}
+      {open && (
+        <div className="border-t border-gray-100 divide-y divide-gray-100">
+          {event.sequences
+            .sort((a, b) => a.sequence - b.sequence)
+            .map((seq) => {
+              const dur = new Date(seq.endTime).getTime() - new Date(seq.startTime).getTime();
+              const isDispatching = seq.isDispatching === 'Y';
+              return (
+                <SeqDetail key={seq.uuid} seq={seq} dur={dur} isDispatching={isDispatching} />
+              );
+            })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function MonitoringPage() {
   const [searchLot, setSearchLot] = useState('');
   const [searchGroup, setSearchGroup] = useState('');
-  const [mcsConnected] = useState(false); // TODO: Task 021에서 실제 연동 상태
+  const { connected: mcsConnected } = useMcsHealth();
 
   // 검색 필터 debounce (300ms)
   const debouncedLot   = useDebouncedValue(searchLot);
@@ -41,6 +272,8 @@ export default function MonitoringPage() {
     ruleId: debouncedGroup || undefined,
   });
 
+  const dispatchEvents = useMemo(() => groupToEvents(data), [data]);
+
   // 실시간 연결 상태 스타일
   const realtimeStyle = {
     connected:    { border: 'border-green-200 bg-green-50 text-green-700',   icon: <Wifi className="h-4 w-4" />,    label: '실시간 연결됨' },
@@ -54,7 +287,6 @@ export default function MonitoringPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">모니터링 대시보드</h1>
-          <p className="text-sm text-gray-500 mt-1">F008 · F009 · F010</p>
         </div>
 
         {/* MCS 연동 상태 */}
@@ -68,13 +300,57 @@ export default function MonitoringPage() {
         </div>
       </div>
 
-      <Tabs defaultValue="logs">
+      <Tabs defaultValue="dispatch">
         <TabsList>
-          <TabsTrigger value="logs">실행 로그</TabsTrigger>
+          <TabsTrigger value="dispatch">디스패칭 이벤트</TabsTrigger>
+          <TabsTrigger value="logs">실행 로그 (raw)</TabsTrigger>
           <TabsTrigger value="stats">통계</TabsTrigger>
         </TabsList>
 
-        {/* 실행 로그 탭 */}
+        {/* 디스패칭 이벤트 탭 */}
+        <TabsContent value="dispatch" className="space-y-3 pt-4">
+          {/* 검색 + 실시간 연결 */}
+          <div className="flex items-center gap-3">
+            <div className="relative flex-1 max-w-xs">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+              <Input
+                className="pl-8"
+                placeholder="Lot ID 검색"
+                value={searchLot}
+                onChange={(e) => setSearchLot(e.target.value)}
+              />
+            </div>
+            <div className={`flex items-center gap-2 rounded-full border px-3 py-1 text-xs ${realtimeStyle.border}`}>
+              {realtimeStyle.icon}
+              {realtimeStyle.label}
+            </div>
+            <Button
+              variant={isRealtimeEnabled ? 'default' : 'outline'}
+              size="sm"
+              onClick={toggleRealtime}
+            >
+              {isRealtimeEnabled ? '실시간 끄기' : '실시간 연결'}
+            </Button>
+          </div>
+
+          {isLoading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+            </div>
+          ) : dispatchEvents.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-gray-200 py-12 text-center text-sm text-gray-400">
+              디스패칭 이벤트가 없습니다
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {dispatchEvents.map((event) => (
+                <DispatchEventCard key={event.key} event={event} />
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* 실행 로그 탭 (raw) */}
         <TabsContent value="logs" className="space-y-4 pt-4">
           {/* 검색 필터 + 실시간 연결 버튼 */}
           <div className="flex items-center gap-3">
@@ -115,7 +391,7 @@ export default function MonitoringPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Lot ID</TableHead>
-                    <TableHead>룰 ID</TableHead>
+                    <TableHead>블록 이름</TableHead>
                     <TableHead>시퀀스</TableHead>
                     <TableHead>결과 건수</TableHead>
                     <TableHead>디스패칭</TableHead>
@@ -143,7 +419,9 @@ export default function MonitoringPage() {
                       return (
                         <TableRow key={r.uuid}>
                           <TableCell className="font-mono text-sm">{r.lotId}</TableCell>
-                          <TableCell className="text-sm">{r.ruleId}</TableCell>
+                          <TableCell className="text-sm">
+                            {r.ruleName ?? <span className="text-gray-400 font-mono text-xs">{r.ruleId.slice(0, 8)}…</span>}
+                          </TableCell>
                           <TableCell className="text-sm">#{r.sequence}</TableCell>
                           <TableCell className="text-sm">{r.count}건</TableCell>
                           <TableCell>
