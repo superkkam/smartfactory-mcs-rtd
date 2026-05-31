@@ -1,0 +1,104 @@
+{
+  "S1_Small": {
+    "astar": {
+      "makespan": {
+        "mean": 247.1983,
+        "std": 46.414,
+        "median": 236.243,
+        "ci_low": 131.8902,
+        "ci_high": 362.5065,
+        "n": 3
+      },
+      "avg_transfer_time": {
+        "mean": 157.1073,
+        "std": 45.1384,
+        "median": 176.667,
+        "ci_low": 44.9682,
+        "ci_high": 269.2465,
+        "n": 3
+      },
+      "amr_utilization": {
+        "mean": 81.4267,
+        "std": 6.0764,
+        "median": 84.61,
+        "ci_low": 66.3309,
+        "ci_high": 96.5225,
+        "n": 3
+      },
+      "throughput": {
+        "mean": 0.0133,
+        "std": 0.0034,
+        "median": 0.0133,
+        "ci_low": 0.005,
+        "ci_high": 0.0217,
+        "n": 3
+      },
+      "deadlock_count": {
+        "mean": 0.0,
+        "std": 0.0,
+        "median": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.0,
+        "n": 3
+      },
+      "path_optimality": {
+        "mean": 100.0,
+        "std": 0.0,
+        "median": 100.0,
+        "ci_low": 100.0,
+        "ci_high": 100.0,
+        "n": 3
+      }
+    },
+    "cbs_ts": {
+      "makespan": {
+        "mean": 247.1983,
+        "std": 46.414,
+        "median": 236.243,
+        "ci_low": 131.8902,
+        "ci_high": 362.5065,
+        "n": 3
+      },
+      "avg_transfer_time": {
+        "mean": 157.1073,
+        "std": 45.1384,
+        "median": 176.667,
+        "ci_low": 44.9682,
+        "ci_high": 269.2465,
+        "n": 3
+      },
+      "amr_utilization": {
+        "mean": 81.4267,
+        "std": 6.0764,
+        "median": 84.61,
+        "ci_low": 66.3309,
+        "ci_high": 96.5225,
+        "n": 3
+      },
+      "throughput": {
+        "mean": 0.0133,
+        "std": 0.0034,
+        "median": 0.0133,
+        "ci_low": 0.005,
+        "ci_high": 0.0217,
+        "n": 3
+      },
+      "deadlock_count": {
+        "mean": 0.0,
+        "std": 0.0,
+        "median": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.0,
+        "n": 3
+      },
+      "path_optimality": {
+        "mean": 100.0,
+        "std": 0.0,
+        "median": 100.0,
+        "ci_low": 100.0,
+        "ci_high": 100.0,
+        "n": 3
+      }
+    }
+  }
+}

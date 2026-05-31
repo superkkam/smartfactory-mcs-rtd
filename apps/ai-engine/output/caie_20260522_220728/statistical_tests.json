@@ -1,0 +1,88 @@
+{
+  "S1_Small": {
+    "makespan": {
+      "kruskal_wallis": {
+        "H": 0.4286,
+        "p_value": 0.05,
+        "sig": "ns"
+      },
+      "pairwise": {
+        "astar_vs_cbs_ts": {
+          "p_adj": 1.0,
+          "effect_r": 0.0,
+          "sig": "ns"
+        }
+      }
+    },
+    "avg_transfer_time": {
+      "kruskal_wallis": {
+        "H": 0.4286,
+        "p_value": 0.05,
+        "sig": "ns"
+      },
+      "pairwise": {
+        "astar_vs_cbs_ts": {
+          "p_adj": 1.0,
+          "effect_r": 0.0,
+          "sig": "ns"
+        }
+      }
+    },
+    "amr_utilization": {
+      "kruskal_wallis": {
+        "H": 0.4286,
+        "p_value": 0.05,
+        "sig": "ns"
+      },
+      "pairwise": {
+        "astar_vs_cbs_ts": {
+          "p_adj": 1.0,
+          "effect_r": 0.0,
+          "sig": "ns"
+        }
+      }
+    },
+    "throughput": {
+      "kruskal_wallis": {
+        "H": 0.4286,
+        "p_value": 0.05,
+        "sig": "ns"
+      },
+      "pairwise": {
+        "astar_vs_cbs_ts": {
+          "p_adj": 1.0,
+          "effect_r": 0.0,
+          "sig": "ns"
+        }
+      }
+    },
+    "deadlock_count": {
+      "kruskal_wallis": {
+        "H": 3.8571,
+        "p_value": 0.05,
+        "sig": "ns"
+      },
+      "pairwise": {
+        "astar_vs_cbs_ts": {
+          "p_adj": 1.0,
+          "effect_r": 0.0,
+          "sig": "ns"
+        }
+      }
+    },
+    "path_optimality": {
+      "kruskal_wallis": {
+        "H": 3.8571,
+        "p_value": 0.05,
+        "sig": "ns"
+      },
+      "pairwise": {
+        "astar_vs_cbs_ts": {
+          "p_adj": 1.0,
+          "effect_r": 0.0,
+          "sig": "ns"
+        }
+      }
+    }
+  }
+}

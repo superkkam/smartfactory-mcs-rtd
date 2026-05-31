@@ -1,0 +1,18 @@
+\begin{table}[htbp]
+\centering
+\caption{Detailed results for Medium (5 AGVs, 60 tasks) scenario. Values: Mean $\pm$ SD [95\% CI]. Best in \textbf{bold}.}
+\label{tab:detail_s2_medium}
+\small
+\begin{tabular}{@{}lrrrrc@{}}
+\toprule
+\textbf{Metric} & \textbf{A*} & \textbf{PPO-RL} & \textbf{CACTUS} & \textbf{CBS-TS} & \textbf{KW} \\
+\midrule
+Makespan (s) & 294.67 $\pm$ 4.45 [293.01, 296.33] & 295.39 $\pm$ 4.63 [293.66, 297.12] & \textbf{294.49 $\pm$ 4.81 [292.69, 296.28]} & 294.67 $\pm$ 4.45 [293.01, 296.33] & ns \\
+Avg. Transfer Time (s) & \textbf{27.92 $\pm$ 1.90 [27.21, 28.63]} & 30.26 $\pm$ 2.24 [29.43, 31.09] & 28.31 $\pm$ 1.97 [27.57, 29.04] & \textbf{27.92 $\pm$ 1.90 [27.21, 28.63]} & $^{***}$ \\
+AMR Utilization (\%) & 86.46 $\pm$ 7.01 [83.84, 89.07] & \textbf{87.75 $\pm$ 6.05 [85.49, 90.01]} & 86.94 $\pm$ 6.81 [84.39, 89.48] & 86.46 $\pm$ 7.01 [83.84, 89.07] & ns \\
+Throughput (tasks/s) & \textbf{0.15 $\pm$ 0.01 [0.15, 0.16]} & 0.14 $\pm$ 0.01 [0.14, 0.15] & 0.15 $\pm$ 0.01 [0.15, 0.16] & \textbf{0.15 $\pm$ 0.01 [0.15, 0.16]} & $^{**}$ \\
+Deadlock Count & \textbf{0 $\pm$ 0 [0, 0]} & \textbf{0 $\pm$ 0 [0, 0]} & \textbf{0 $\pm$ 0 [0, 0]} & \textbf{0 $\pm$ 0 [0, 0]} & $^{***}$ \\
+Path Optimality (\%) & \textbf{100.00 $\pm$ 0.00 [100.00, 100.00]} & 94.25 $\pm$ 2.19 [93.43, 95.06] & 98.88 $\pm$ 0.93 [98.54, 99.23] & \textbf{100.00 $\pm$ 0.00 [100.00, 100.00]} & $^{***}$ \\
+\bottomrule
+\end{tabular}
+\end{table}

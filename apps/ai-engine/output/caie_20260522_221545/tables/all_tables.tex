@@ -1,0 +1,145 @@
+\documentclass[review]{elsarticle}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{xcolor}
+\usepackage{array}
+\usepackage{caption}
+\usepackage{amsmath}
+\begin{document}
+%% ============================================================
+%% CAIE 논문 표 — caie_tables.py 자동 생성
+%% ============================================================
+
+
+%% === Table 1: Main Results ===
+\begin{table*}[htbp]
+\centering
+\caption{Performance comparison of MAPF algorithms. Values: Mean $\pm$ SD (30 replications). Bold: best value per row. KW: Kruskal--Wallis significance (${}^{***}p<0.001$, ${}^{**}p<0.01$, ${}^{*}p<0.05$, ${}^{\text{ns}}$not significant).}
+\label{tab:main_results}
+\setlength{\tabcolsep}{4pt}
+\small
+\begin{tabular}{@{}llrrrrc@{}}
+\toprule
+\textbf{Scenario} & \textbf{Metric} & \textbf{A*} & \textbf{PPO-RL} & \textbf{CACTUS} & \textbf{CBS-TS} & \textbf{KW} \\
+\midrule
+\multirow{6}{*}{\begin{tabular}[c]{@{}l@{}}\textbf{Small (3 AGVs, 30 tasks)}\end{tabular}} & Makespan (s) & 290.39 $\pm$ 10.09 & \textbf{287.38 $\pm$ 11.29} & 290.75 $\pm$ 10.13 & 290.39 $\pm$ 10.09 & ns \\
+ & Avg. Transfer Time (s) & \textbf{28.45 $\pm$ 2.77} & 30.99 $\pm$ 3.68 & 28.74 $\pm$ 2.77 & \textbf{28.45 $\pm$ 2.77} & $**$ \\
+ & AMR Utilization (\%) & 79.44 $\pm$ 12.38 & \textbf{82.30 $\pm$ 11.12} & 79.79 $\pm$ 12.20 & 79.44 $\pm$ 12.38 & ns \\
+ & Throughput (tasks/s) & \textbf{0.08 $\pm$ 0.01} & 0.08 $\pm$ 0.01 & 0.08 $\pm$ 0.01 & \textbf{0.08 $\pm$ 0.01} & ns \\
+ & Deadlock Count & \textbf{0 $\pm$ 0} & \textbf{0 $\pm$ 0} & \textbf{0 $\pm$ 0} & \textbf{0 $\pm$ 0} & $***$ \\
+ & Path Optimality (\%) & \textbf{100.00 $\pm$ 0.00} & 94.41 $\pm$ 3.51 & 98.96 $\pm$ 1.32 & \textbf{100.00 $\pm$ 0.00} & $***$ \\
+\midrule
+\multirow{6}{*}{\begin{tabular}[c]{@{}l@{}}\textbf{Medium (5 AGVs, 60 tasks)}\end{tabular}} & Makespan (s) & 294.67 $\pm$ 4.45 & 295.39 $\pm$ 4.63 & \textbf{294.49 $\pm$ 4.81} & 294.67 $\pm$ 4.45 & ns \\
+ & Avg. Transfer Time (s) & \textbf{27.92 $\pm$ 1.90} & 30.26 $\pm$ 2.24 & 28.31 $\pm$ 1.97 & \textbf{27.92 $\pm$ 1.90} & $***$ \\
+ & AMR Utilization (\%) & 86.46 $\pm$ 7.01 & \textbf{87.75 $\pm$ 6.05} & 86.94 $\pm$ 6.81 & 86.46 $\pm$ 7.01 & ns \\
+ & Throughput (tasks/s) & \textbf{0.15 $\pm$ 0.01} & 0.14 $\pm$ 0.01 & 0.15 $\pm$ 0.01 & \textbf{0.15 $\pm$ 0.01} & $**$ \\
+ & Deadlock Count & \textbf{0 $\pm$ 0} & \textbf{0 $\pm$ 0} & \textbf{0 $\pm$ 0} & \textbf{0 $\pm$ 0} & $***$ \\
+ & Path Optimality (\%) & \textbf{100.00 $\pm$ 0.00} & 94.25 $\pm$ 2.19 & 98.88 $\pm$ 0.93 & \textbf{100.00 $\pm$ 0.00} & $***$ \\
+\midrule
+\multirow{6}{*}{\begin{tabular}[c]{@{}l@{}}\textbf{Large (8 AGVs, 100 tasks)}\end{tabular}} & Makespan (s) & 297.29 $\pm$ 2.27 & \textbf{296.06 $\pm$ 3.36} & 296.71 $\pm$ 2.42 & 297.29 $\pm$ 2.27 & ns \\
+ & Avg. Transfer Time (s) & \textbf{27.48 $\pm$ 1.84} & 29.51 $\pm$ 2.05 & 27.75 $\pm$ 1.76 & \textbf{27.48 $\pm$ 1.84} & $***$ \\
+ & AMR Utilization (\%) & 88.07 $\pm$ 5.09 & \textbf{88.76 $\pm$ 3.46} & 88.32 $\pm$ 4.74 & 88.07 $\pm$ 5.09 & ns \\
+ & Throughput (tasks/s) & \textbf{0.25 $\pm$ 0.02} & 0.24 $\pm$ 0.02 & 0.25 $\pm$ 0.02 & \textbf{0.25 $\pm$ 0.02} & $**$ \\
+ & Deadlock Count & \textbf{0 $\pm$ 0} & \textbf{0 $\pm$ 0} & \textbf{0 $\pm$ 0} & \textbf{0 $\pm$ 0} & $***$ \\
+ & Path Optimality (\%) & \textbf{100.00 $\pm$ 0.00} & 94.07 $\pm$ 1.61 & 98.73 $\pm$ 0.68 & \textbf{100.00 $\pm$ 0.00} & $***$ \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+%% === Table 2: Statistical Significance ===
+\begin{table}[htbp]
+\centering
+\caption{Pairwise post-hoc comparison results (Wilcoxon signed-rank test, Holm--Bonferroni corrected) for Medium (5 AGVs, 60 tasks). Effect size: rank-biserial $r$. Significance: ${}^{***}p<0.001$, ${}^{**}p<0.01$, ${}^{*}p<0.05$.}
+\label{tab:significance}
+\small
+\begin{tabular}{@{}lcccccc@{}}
+\toprule
+\textbf{Metric} & \textbf{A* vs PPO-RL} & \textbf{A* vs CACTUS} & \textbf{A* vs CBS-TS} & \textbf{PPO-RL vs CACTUS} & \textbf{PPO-RL vs CBS-TS} & \textbf{CACTUS vs CBS-TS} \\
+\midrule
+Makespan (s) & $p=1.000$\\($r=0.10$) & $p=1.000$\\($r=0.30$) & $p=1.000$\\($r=0.00$) & $p=1.000$\\($r=0.24$) & $p=1.000$\\($r=0.10$) & $p=1.000$\\($r=0.30$) \\
+Avg. Transfer Time (s) & $p=0.000^{***}$\\($r=0.76$) & $p=0.031^{*}$\\($r=0.51$) & $p=1.000$\\($r=0.00$) & $p=0.000^{***}$\\($r=0.73$) & $p=0.000^{***}$\\($r=0.76$) & $p=0.031^{*}$\\($r=0.51$) \\
+AMR Utilization (\%) & $p=1.000$\\($r=0.11$) & $p=0.372$\\($r=0.37$) & $p=1.000$\\($r=0.00$) & $p=1.000$\\($r=0.12$) & $p=1.000$\\($r=0.11$) & $p=0.372$\\($r=0.37$) \\
+Throughput (tasks/s) & $p=0.000^{***}$\\($r=0.87$) & $p=0.223$\\($r=0.56$) & $p=1.000$\\($r=0.00$) & $p=0.000^{***}$\\($r=0.84$) & $p=0.000^{***}$\\($r=0.87$) & $p=0.223$\\($r=0.56$) \\
+Deadlock Count & $p=1.000$\\($r=0.00$) & $p=1.000$\\($r=0.00$) & $p=1.000$\\($r=0.00$) & $p=1.000$\\($r=0.00$) & $p=1.000$\\($r=0.00$) & $p=1.000$\\($r=0.00$) \\
+Path Optimality (\%) & $p=0.000^{***}$\\($r=0.87$) & $p=0.000^{***}$\\($r=0.87$) & $p=1.000$\\($r=0.00$) & $p=0.000^{***}$\\($r=0.87$) & $p=0.000^{***}$\\($r=0.87$) & $p=0.000^{***}$\\($r=0.87$) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%% === Table 3: Algorithm Ranking ===
+\begin{table}[htbp]
+\centering
+\caption{Average rank of each algorithm across all scenarios and metrics (lower rank = better performance). Ranks computed per metric per scenario, then averaged over $3 \times 6 = 18$ evaluations.}
+\label{tab:ranking}
+\begin{tabular}{@{}clcccc@{}}
+\toprule
+\textbf{Rank} & \textbf{Algorithm} & \textbf{Avg. Rank} & \textbf{Best Metric Count} & \textbf{Wins} & \textbf{Losses} \\
+\midrule
+1 & \textbf{A*} & 1.56 & 12 & 20 & 10 \\
+2 & CACTUS & 2.72 & 4 & 20 & 25 \\
+3 & PPO-RL & 2.83 & 8 & 15 & 30 \\
+4 & CBS-TS & 2.89 & 12 & 20 & 10 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%% === Table: S1_Small Detail ===
+\begin{table}[htbp]
+\centering
+\caption{Detailed results for Small (3 AGVs, 30 tasks) scenario. Values: Mean $\pm$ SD [95\% CI]. Best in \textbf{bold}.}
+\label{tab:detail_s1_small}
+\small
+\begin{tabular}{@{}lrrrrc@{}}
+\toprule
+\textbf{Metric} & \textbf{A*} & \textbf{PPO-RL} & \textbf{CACTUS} & \textbf{CBS-TS} & \textbf{KW} \\
+\midrule
+Makespan (s) & 290.39 $\pm$ 10.09 [286.63, 294.16] & \textbf{287.38 $\pm$ 11.29 [283.16, 291.59]} & 290.75 $\pm$ 10.13 [286.96, 294.53] & 290.39 $\pm$ 10.09 [286.63, 294.16] & ns \\
+Avg. Transfer Time (s) & \textbf{28.45 $\pm$ 2.77 [27.42, 29.49]} & 30.99 $\pm$ 3.68 [29.62, 32.37] & 28.74 $\pm$ 2.77 [27.70, 29.77] & \textbf{28.45 $\pm$ 2.77 [27.42, 29.49]} & $^{**}$ \\
+AMR Utilization (\%) & 79.44 $\pm$ 12.38 [74.81, 84.06] & \textbf{82.30 $\pm$ 11.12 [78.15, 86.46]} & 79.79 $\pm$ 12.20 [75.24, 84.35] & 79.44 $\pm$ 12.38 [74.81, 84.06] & ns \\
+Throughput (tasks/s) & \textbf{0.08 $\pm$ 0.01 [0.08, 0.09]} & 0.08 $\pm$ 0.01 [0.07, 0.08] & 0.08 $\pm$ 0.01 [0.08, 0.09] & \textbf{0.08 $\pm$ 0.01 [0.08, 0.09]} & ns \\
+Deadlock Count & \textbf{0 $\pm$ 0 [0, 0]} & \textbf{0 $\pm$ 0 [0, 0]} & \textbf{0 $\pm$ 0 [0, 0]} & \textbf{0 $\pm$ 0 [0, 0]} & $^{***}$ \\
+Path Optimality (\%) & \textbf{100.00 $\pm$ 0.00 [100.00, 100.00]} & 94.41 $\pm$ 3.51 [93.10, 95.72] & 98.96 $\pm$ 1.32 [98.47, 99.46] & \textbf{100.00 $\pm$ 0.00 [100.00, 100.00]} & $^{***}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%% === Table: S2_Medium Detail ===
+\begin{table}[htbp]
+\centering
+\caption{Detailed results for Medium (5 AGVs, 60 tasks) scenario. Values: Mean $\pm$ SD [95\% CI]. Best in \textbf{bold}.}
+\label{tab:detail_s2_medium}
+\small
+\begin{tabular}{@{}lrrrrc@{}}
+\toprule
+\textbf{Metric} & \textbf{A*} & \textbf{PPO-RL} & \textbf{CACTUS} & \textbf{CBS-TS} & \textbf{KW} \\
+\midrule
+Makespan (s) & 294.67 $\pm$ 4.45 [293.01, 296.33] & 295.39 $\pm$ 4.63 [293.66, 297.12] & \textbf{294.49 $\pm$ 4.81 [292.69, 296.28]} & 294.67 $\pm$ 4.45 [293.01, 296.33] & ns \\
+Avg. Transfer Time (s) & \textbf{27.92 $\pm$ 1.90 [27.21, 28.63]} & 30.26 $\pm$ 2.24 [29.43, 31.09] & 28.31 $\pm$ 1.97 [27.57, 29.04] & \textbf{27.92 $\pm$ 1.90 [27.21, 28.63]} & $^{***}$ \\
+AMR Utilization (\%) & 86.46 $\pm$ 7.01 [83.84, 89.07] & \textbf{87.75 $\pm$ 6.05 [85.49, 90.01]} & 86.94 $\pm$ 6.81 [84.39, 89.48] & 86.46 $\pm$ 7.01 [83.84, 89.07] & ns \\
+Throughput (tasks/s) & \textbf{0.15 $\pm$ 0.01 [0.15, 0.16]} & 0.14 $\pm$ 0.01 [0.14, 0.15] & 0.15 $\pm$ 0.01 [0.15, 0.16] & \textbf{0.15 $\pm$ 0.01 [0.15, 0.16]} & $^{**}$ \\
+Deadlock Count & \textbf{0 $\pm$ 0 [0, 0]} & \textbf{0 $\pm$ 0 [0, 0]} & \textbf{0 $\pm$ 0 [0, 0]} & \textbf{0 $\pm$ 0 [0, 0]} & $^{***}$ \\
+Path Optimality (\%) & \textbf{100.00 $\pm$ 0.00 [100.00, 100.00]} & 94.25 $\pm$ 2.19 [93.43, 95.06] & 98.88 $\pm$ 0.93 [98.54, 99.23] & \textbf{100.00 $\pm$ 0.00 [100.00, 100.00]} & $^{***}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%% === Table: S3_Large Detail ===
+\begin{table}[htbp]
+\centering
+\caption{Detailed results for Large (8 AGVs, 100 tasks) scenario. Values: Mean $\pm$ SD [95\% CI]. Best in \textbf{bold}.}
+\label{tab:detail_s3_large}
+\small
+\begin{tabular}{@{}lrrrrc@{}}
+\toprule
+\textbf{Metric} & \textbf{A*} & \textbf{PPO-RL} & \textbf{CACTUS} & \textbf{CBS-TS} & \textbf{KW} \\
+\midrule
+Makespan (s) & 297.29 $\pm$ 2.27 [296.44, 298.14] & \textbf{296.06 $\pm$ 3.36 [294.81, 297.32]} & 296.71 $\pm$ 2.42 [295.80, 297.61] & 297.29 $\pm$ 2.27 [296.44, 298.14] & ns \\
+Avg. Transfer Time (s) & \textbf{27.48 $\pm$ 1.84 [26.79, 28.17]} & 29.51 $\pm$ 2.05 [28.75, 30.28] & 27.75 $\pm$ 1.76 [27.10, 28.41] & \textbf{27.48 $\pm$ 1.84 [26.79, 28.17]} & $^{***}$ \\
+AMR Utilization (\%) & 88.07 $\pm$ 5.09 [86.16, 89.97] & \textbf{88.76 $\pm$ 3.46 [87.47, 90.05]} & 88.32 $\pm$ 4.74 [86.56, 90.09] & 88.07 $\pm$ 5.09 [86.16, 89.97] & ns \\
+Throughput (tasks/s) & \textbf{0.25 $\pm$ 0.02 [0.25, 0.26]} & 0.24 $\pm$ 0.02 [0.23, 0.24] & 0.25 $\pm$ 0.02 [0.25, 0.26] & \textbf{0.25 $\pm$ 0.02 [0.25, 0.26]} & $^{**}$ \\
+Deadlock Count & \textbf{0 $\pm$ 0 [0, 0]} & \textbf{0 $\pm$ 0 [0, 0]} & \textbf{0 $\pm$ 0 [0, 0]} & \textbf{0 $\pm$ 0 [0, 0]} & $^{***}$ \\
+Path Optimality (\%) & \textbf{100.00 $\pm$ 0.00 [100.00, 100.00]} & 94.07 $\pm$ 1.61 [93.47, 94.67] & 98.73 $\pm$ 0.68 [98.48, 98.98] & \textbf{100.00 $\pm$ 0.00 [100.00, 100.00]} & $^{***}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+\end{document}

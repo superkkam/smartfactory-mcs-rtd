@@ -1,0 +1,5 @@
+scenario,algorithm,makespan_mean,avg_transfer_time_mean,amr_utilization_mean,throughput_mean,deadlock_count_mean,path_optimality_mean,makespan_std,avg_transfer_time_std,amr_utilization_std,throughput_std,deadlock_count_std,path_optimality_std
+S3_High,A*,598.735,26.841,45.72,0.544,0.0,100.0,0.629,0.431,1.75,0.021,0.0,0.0
+S3_High,PPO-RL,598.735,28.319,47.942,0.541,0.0,94.446,0.629,0.638,1.951,0.021,0.0,0.392
+S3_High,CACTUS,598.735,27.157,46.204,0.543,0.0,98.906,0.629,0.417,1.796,0.021,0.0,0.268
+S3_High,CBS-TS,598.735,26.841,45.72,0.544,0.0,100.0,0.629,0.431,1.75,0.021,0.0,0.0

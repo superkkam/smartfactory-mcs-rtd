@@ -1,0 +1,27 @@
+{
+  "fixture_path": "scripts/fixtures/fab_layout.json",
+  "graph_nodes": 76,
+  "graph_edges": 90,
+  "port_count": 14,
+  "algorithms": [
+    "astar",
+    "cbs_ts"
+  ],
+  "algorithm_labels": {
+    "astar": "A*",
+    "ai_ppo": "PPO-RL",
+    "cactus": "CACTUS",
+    "cbs_ts": "CBS-TS"
+  },
+  "scenarios": [
+    "S1_Small"
+  ],
+  "seed_count": 3,
+  "seeds": [
+    1,
+    2,
+    3
+  ],
+  "elapsed_seconds": 0.2,
+  "timestamp": "2026-05-22T22:07:28.754909"
+}

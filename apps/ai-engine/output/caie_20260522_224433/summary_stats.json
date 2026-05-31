@@ -1,0 +1,204 @@
+{
+  "S3_High": {
+    "astar": {
+      "makespan": {
+        "mean": 598.7346,
+        "std": 0.6294,
+        "median": 598.978,
+        "ci_low": 597.9533,
+        "ci_high": 599.5159,
+        "n": 5
+      },
+      "avg_transfer_time": {
+        "mean": 26.8406,
+        "std": 0.4313,
+        "median": 26.796,
+        "ci_low": 26.3052,
+        "ci_high": 27.376,
+        "n": 5
+      },
+      "amr_utilization": {
+        "mean": 45.72,
+        "std": 1.7504,
+        "median": 44.59,
+        "ci_low": 43.5469,
+        "ci_high": 47.8931,
+        "n": 5
+      },
+      "throughput": {
+        "mean": 0.544,
+        "std": 0.0206,
+        "median": 0.5383,
+        "ci_low": 0.5185,
+        "ci_high": 0.5695,
+        "n": 5
+      },
+      "deadlock_count": {
+        "mean": 0.0,
+        "std": 0.0,
+        "median": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.0,
+        "n": 5
+      },
+      "path_optimality": {
+        "mean": 100.0,
+        "std": 0.0,
+        "median": 100.0,
+        "ci_low": 100.0,
+        "ci_high": 100.0,
+        "n": 5
+      }
+    },
+    "ai_ppo": {
+      "makespan": {
+        "mean": 598.7346,
+        "std": 0.6294,
+        "median": 598.978,
+        "ci_low": 597.9533,
+        "ci_high": 599.5159,
+        "n": 5
+      },
+      "avg_transfer_time": {
+        "mean": 28.3192,
+        "std": 0.6379,
+        "median": 28.328,
+        "ci_low": 27.5273,
+        "ci_high": 29.1111,
+        "n": 5
+      },
+      "amr_utilization": {
+        "mean": 47.942,
+        "std": 1.9512,
+        "median": 47.23,
+        "ci_low": 45.5196,
+        "ci_high": 50.3644,
+        "n": 5
+      },
+      "throughput": {
+        "mean": 0.5407,
+        "std": 0.021,
+        "median": 0.5333,
+        "ci_low": 0.5146,
+        "ci_high": 0.5667,
+        "n": 5
+      },
+      "deadlock_count": {
+        "mean": 0.0,
+        "std": 0.0,
+        "median": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.0,
+        "n": 5
+      },
+      "path_optimality": {
+        "mean": 94.446,
+        "std": 0.3915,
+        "median": 94.6,
+        "ci_low": 93.96,
+        "ci_high": 94.932,
+        "n": 5
+      }
+    },
+    "cactus": {
+      "makespan": {
+        "mean": 598.7346,
+        "std": 0.6294,
+        "median": 598.978,
+        "ci_low": 597.9533,
+        "ci_high": 599.5159,
+        "n": 5
+      },
+      "avg_transfer_time": {
+        "mean": 27.1568,
+        "std": 0.4175,
+        "median": 27.181,
+        "ci_low": 26.6385,
+        "ci_high": 27.6751,
+        "n": 5
+      },
+      "amr_utilization": {
+        "mean": 46.204,
+        "std": 1.7964,
+        "median": 45.09,
+        "ci_low": 43.9738,
+        "ci_high": 48.4342,
+        "n": 5
+      },
+      "throughput": {
+        "mean": 0.5433,
+        "std": 0.0205,
+        "median": 0.5383,
+        "ci_low": 0.5179,
+        "ci_high": 0.5688,
+        "n": 5
+      },
+      "deadlock_count": {
+        "mean": 0.0,
+        "std": 0.0,
+        "median": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.0,
+        "n": 5
+      },
+      "path_optimality": {
+        "mean": 98.906,
+        "std": 0.268,
+        "median": 99.0,
+        "ci_low": 98.5733,
+        "ci_high": 99.2387,
+        "n": 5
+      }
+    },
+    "cbs_ts": {
+      "makespan": {
+        "mean": 598.7346,
+        "std": 0.6294,
+        "median": 598.978,
+        "ci_low": 597.9533,
+        "ci_high": 599.5159,
+        "n": 5
+      },
+      "avg_transfer_time": {
+        "mean": 26.8406,
+        "std": 0.4313,
+        "median": 26.796,
+        "ci_low": 26.3052,
+        "ci_high": 27.376,
+        "n": 5
+      },
+      "amr_utilization": {
+        "mean": 45.72,
+        "std": 1.7504,
+        "median": 44.59,
+        "ci_low": 43.5469,
+        "ci_high": 47.8931,
+        "n": 5
+      },
+      "throughput": {
+        "mean": 0.544,
+        "std": 0.0206,
+        "median": 0.5383,
+        "ci_low": 0.5185,
+        "ci_high": 0.5695,
+        "n": 5
+      },
+      "deadlock_count": {
+        "mean": 0.0,
+        "std": 0.0,
+        "median": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.0,
+        "n": 5
+      },
+      "path_optimality": {
+        "mean": 100.0,
+        "std": 0.0,
+        "median": 100.0,
+        "ci_low": 100.0,
+        "ci_high": 100.0,
+        "n": 5
+      }
+    }
+  }
+}

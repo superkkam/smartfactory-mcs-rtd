@@ -1,0 +1,608 @@
+{
+  "S1_Small": {
+    "astar": {
+      "makespan": {
+        "mean": 290.3933,
+        "std": 10.0879,
+        "median": 294.226,
+        "ci_low": 286.6268,
+        "ci_high": 294.1597,
+        "n": 30
+      },
+      "avg_transfer_time": {
+        "mean": 28.4536,
+        "std": 2.7737,
+        "median": 29.1645,
+        "ci_low": 27.418,
+        "ci_high": 29.4892,
+        "n": 30
+      },
+      "amr_utilization": {
+        "mean": 79.435,
+        "std": 12.3834,
+        "median": 80.76,
+        "ci_low": 74.8115,
+        "ci_high": 84.0585,
+        "n": 30
+      },
+      "throughput": {
+        "mean": 0.0814,
+        "std": 0.0126,
+        "median": 0.085,
+        "ci_low": 0.0768,
+        "ci_high": 0.0861,
+        "n": 30
+      },
+      "deadlock_count": {
+        "mean": 0.0,
+        "std": 0.0,
+        "median": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.0,
+        "n": 30
+      },
+      "path_optimality": {
+        "mean": 100.0,
+        "std": 0.0,
+        "median": 100.0,
+        "ci_low": 100.0,
+        "ci_high": 100.0,
+        "n": 30
+      }
+    },
+    "ai_ppo": {
+      "makespan": {
+        "mean": 290.3933,
+        "std": 10.0879,
+        "median": 294.226,
+        "ci_low": 286.6268,
+        "ci_high": 294.1597,
+        "n": 30
+      },
+      "avg_transfer_time": {
+        "mean": 28.4536,
+        "std": 2.7737,
+        "median": 29.1645,
+        "ci_low": 27.418,
+        "ci_high": 29.4892,
+        "n": 30
+      },
+      "amr_utilization": {
+        "mean": 79.435,
+        "std": 12.3834,
+        "median": 80.76,
+        "ci_low": 74.8115,
+        "ci_high": 84.0585,
+        "n": 30
+      },
+      "throughput": {
+        "mean": 0.0814,
+        "std": 0.0126,
+        "median": 0.085,
+        "ci_low": 0.0768,
+        "ci_high": 0.0861,
+        "n": 30
+      },
+      "deadlock_count": {
+        "mean": 0.0,
+        "std": 0.0,
+        "median": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.0,
+        "n": 30
+      },
+      "path_optimality": {
+        "mean": 100.0,
+        "std": 0.0,
+        "median": 100.0,
+        "ci_low": 100.0,
+        "ci_high": 100.0,
+        "n": 30
+      }
+    },
+    "cactus": {
+      "makespan": {
+        "mean": 290.3933,
+        "std": 10.0879,
+        "median": 294.226,
+        "ci_low": 286.6268,
+        "ci_high": 294.1597,
+        "n": 30
+      },
+      "avg_transfer_time": {
+        "mean": 28.4536,
+        "std": 2.7737,
+        "median": 29.1645,
+        "ci_low": 27.418,
+        "ci_high": 29.4892,
+        "n": 30
+      },
+      "amr_utilization": {
+        "mean": 79.435,
+        "std": 12.3834,
+        "median": 80.76,
+        "ci_low": 74.8115,
+        "ci_high": 84.0585,
+        "n": 30
+      },
+      "throughput": {
+        "mean": 0.0814,
+        "std": 0.0126,
+        "median": 0.085,
+        "ci_low": 0.0768,
+        "ci_high": 0.0861,
+        "n": 30
+      },
+      "deadlock_count": {
+        "mean": 0.0,
+        "std": 0.0,
+        "median": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.0,
+        "n": 30
+      },
+      "path_optimality": {
+        "mean": 100.0,
+        "std": 0.0,
+        "median": 100.0,
+        "ci_low": 100.0,
+        "ci_high": 100.0,
+        "n": 30
+      }
+    },
+    "cbs_ts": {
+      "makespan": {
+        "mean": 290.3933,
+        "std": 10.0879,
+        "median": 294.226,
+        "ci_low": 286.6268,
+        "ci_high": 294.1597,
+        "n": 30
+      },
+      "avg_transfer_time": {
+        "mean": 28.4536,
+        "std": 2.7737,
+        "median": 29.1645,
+        "ci_low": 27.418,
+        "ci_high": 29.4892,
+        "n": 30
+      },
+      "amr_utilization": {
+        "mean": 79.435,
+        "std": 12.3834,
+        "median": 80.76,
+        "ci_low": 74.8115,
+        "ci_high": 84.0585,
+        "n": 30
+      },
+      "throughput": {
+        "mean": 0.0814,
+        "std": 0.0126,
+        "median": 0.085,
+        "ci_low": 0.0768,
+        "ci_high": 0.0861,
+        "n": 30
+      },
+      "deadlock_count": {
+        "mean": 0.0,
+        "std": 0.0,
+        "median": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.0,
+        "n": 30
+      },
+      "path_optimality": {
+        "mean": 100.0,
+        "std": 0.0,
+        "median": 100.0,
+        "ci_low": 100.0,
+        "ci_high": 100.0,
+        "n": 30
+      }
+    }
+  },
+  "S2_Medium": {
+    "astar": {
+      "makespan": {
+        "mean": 294.6695,
+        "std": 4.4535,
+        "median": 295.958,
+        "ci_low": 293.0067,
+        "ci_high": 296.3323,
+        "n": 30
+      },
+      "avg_transfer_time": {
+        "mean": 27.9234,
+        "std": 1.8993,
+        "median": 28.1095,
+        "ci_low": 27.2142,
+        "ci_high": 28.6325,
+        "n": 30
+      },
+      "amr_utilization": {
+        "mean": 86.4577,
+        "std": 7.0054,
+        "median": 87.145,
+        "ci_low": 83.8421,
+        "ci_high": 89.0732,
+        "n": 30
+      },
+      "throughput": {
+        "mean": 0.1525,
+        "std": 0.0142,
+        "median": 0.1533,
+        "ci_low": 0.1472,
+        "ci_high": 0.1579,
+        "n": 30
+      },
+      "deadlock_count": {
+        "mean": 0.0,
+        "std": 0.0,
+        "median": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.0,
+        "n": 30
+      },
+      "path_optimality": {
+        "mean": 100.0,
+        "std": 0.0,
+        "median": 100.0,
+        "ci_low": 100.0,
+        "ci_high": 100.0,
+        "n": 30
+      }
+    },
+    "ai_ppo": {
+      "makespan": {
+        "mean": 294.6695,
+        "std": 4.4535,
+        "median": 295.958,
+        "ci_low": 293.0067,
+        "ci_high": 296.3323,
+        "n": 30
+      },
+      "avg_transfer_time": {
+        "mean": 27.9234,
+        "std": 1.8993,
+        "median": 28.1095,
+        "ci_low": 27.2142,
+        "ci_high": 28.6325,
+        "n": 30
+      },
+      "amr_utilization": {
+        "mean": 86.4577,
+        "std": 7.0054,
+        "median": 87.145,
+        "ci_low": 83.8421,
+        "ci_high": 89.0732,
+        "n": 30
+      },
+      "throughput": {
+        "mean": 0.1525,
+        "std": 0.0142,
+        "median": 0.1533,
+        "ci_low": 0.1472,
+        "ci_high": 0.1579,
+        "n": 30
+      },
+      "deadlock_count": {
+        "mean": 0.0,
+        "std": 0.0,
+        "median": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.0,
+        "n": 30
+      },
+      "path_optimality": {
+        "mean": 100.0,
+        "std": 0.0,
+        "median": 100.0,
+        "ci_low": 100.0,
+        "ci_high": 100.0,
+        "n": 30
+      }
+    },
+    "cactus": {
+      "makespan": {
+        "mean": 294.6695,
+        "std": 4.4535,
+        "median": 295.958,
+        "ci_low": 293.0067,
+        "ci_high": 296.3323,
+        "n": 30
+      },
+      "avg_transfer_time": {
+        "mean": 27.9234,
+        "std": 1.8993,
+        "median": 28.1095,
+        "ci_low": 27.2142,
+        "ci_high": 28.6325,
+        "n": 30
+      },
+      "amr_utilization": {
+        "mean": 86.4577,
+        "std": 7.0054,
+        "median": 87.145,
+        "ci_low": 83.8421,
+        "ci_high": 89.0732,
+        "n": 30
+      },
+      "throughput": {
+        "mean": 0.1525,
+        "std": 0.0142,
+        "median": 0.1533,
+        "ci_low": 0.1472,
+        "ci_high": 0.1579,
+        "n": 30
+      },
+      "deadlock_count": {
+        "mean": 0.0,
+        "std": 0.0,
+        "median": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.0,
+        "n": 30
+      },
+      "path_optimality": {
+        "mean": 100.0,
+        "std": 0.0,
+        "median": 100.0,
+        "ci_low": 100.0,
+        "ci_high": 100.0,
+        "n": 30
+      }
+    },
+    "cbs_ts": {
+      "makespan": {
+        "mean": 294.6695,
+        "std": 4.4535,
+        "median": 295.958,
+        "ci_low": 293.0067,
+        "ci_high": 296.3323,
+        "n": 30
+      },
+      "avg_transfer_time": {
+        "mean": 27.9234,
+        "std": 1.8993,
+        "median": 28.1095,
+        "ci_low": 27.2142,
+        "ci_high": 28.6325,
+        "n": 30
+      },
+      "amr_utilization": {
+        "mean": 86.4577,
+        "std": 7.0054,
+        "median": 87.145,
+        "ci_low": 83.8421,
+        "ci_high": 89.0732,
+        "n": 30
+      },
+      "throughput": {
+        "mean": 0.1525,
+        "std": 0.0142,
+        "median": 0.1533,
+        "ci_low": 0.1472,
+        "ci_high": 0.1579,
+        "n": 30
+      },
+      "deadlock_count": {
+        "mean": 0.0,
+        "std": 0.0,
+        "median": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.0,
+        "n": 30
+      },
+      "path_optimality": {
+        "mean": 100.0,
+        "std": 0.0,
+        "median": 100.0,
+        "ci_low": 100.0,
+        "ci_high": 100.0,
+        "n": 30
+      }
+    }
+  },
+  "S3_Large": {
+    "astar": {
+      "makespan": {
+        "mean": 297.2938,
+        "std": 2.2747,
+        "median": 297.965,
+        "ci_low": 296.4445,
+        "ci_high": 298.1431,
+        "n": 30
+      },
+      "avg_transfer_time": {
+        "mean": 27.4816,
+        "std": 1.8425,
+        "median": 26.875,
+        "ci_low": 26.7936,
+        "ci_high": 28.1695,
+        "n": 30
+      },
+      "amr_utilization": {
+        "mean": 88.0667,
+        "std": 5.0939,
+        "median": 89.62,
+        "ci_low": 86.1648,
+        "ci_high": 89.9685,
+        "n": 30
+      },
+      "throughput": {
+        "mean": 0.2549,
+        "std": 0.0193,
+        "median": 0.255,
+        "ci_low": 0.2477,
+        "ci_high": 0.2621,
+        "n": 30
+      },
+      "deadlock_count": {
+        "mean": 0.0,
+        "std": 0.0,
+        "median": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.0,
+        "n": 30
+      },
+      "path_optimality": {
+        "mean": 100.0,
+        "std": 0.0,
+        "median": 100.0,
+        "ci_low": 100.0,
+        "ci_high": 100.0,
+        "n": 30
+      }
+    },
+    "ai_ppo": {
+      "makespan": {
+        "mean": 297.2938,
+        "std": 2.2747,
+        "median": 297.965,
+        "ci_low": 296.4445,
+        "ci_high": 298.1431,
+        "n": 30
+      },
+      "avg_transfer_time": {
+        "mean": 27.4816,
+        "std": 1.8425,
+        "median": 26.875,
+        "ci_low": 26.7936,
+        "ci_high": 28.1695,
+        "n": 30
+      },
+      "amr_utilization": {
+        "mean": 88.0667,
+        "std": 5.0939,
+        "median": 89.62,
+        "ci_low": 86.1648,
+        "ci_high": 89.9685,
+        "n": 30
+      },
+      "throughput": {
+        "mean": 0.2549,
+        "std": 0.0193,
+        "median": 0.255,
+        "ci_low": 0.2477,
+        "ci_high": 0.2621,
+        "n": 30
+      },
+      "deadlock_count": {
+        "mean": 0.0,
+        "std": 0.0,
+        "median": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.0,
+        "n": 30
+      },
+      "path_optimality": {
+        "mean": 100.0,
+        "std": 0.0,
+        "median": 100.0,
+        "ci_low": 100.0,
+        "ci_high": 100.0,
+        "n": 30
+      }
+    },
+    "cactus": {
+      "makespan": {
+        "mean": 297.2938,
+        "std": 2.2747,
+        "median": 297.965,
+        "ci_low": 296.4445,
+        "ci_high": 298.1431,
+        "n": 30
+      },
+      "avg_transfer_time": {
+        "mean": 27.4816,
+        "std": 1.8425,
+        "median": 26.875,
+        "ci_low": 26.7936,
+        "ci_high": 28.1695,
+        "n": 30
+      },
+      "amr_utilization": {
+        "mean": 88.0667,
+        "std": 5.0939,
+        "median": 89.62,
+        "ci_low": 86.1648,
+        "ci_high": 89.9685,
+        "n": 30
+      },
+      "throughput": {
+        "mean": 0.2549,
+        "std": 0.0193,
+        "median": 0.255,
+        "ci_low": 0.2477,
+        "ci_high": 0.2621,
+        "n": 30
+      },
+      "deadlock_count": {
+        "mean": 0.0,
+        "std": 0.0,
+        "median": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.0,
+        "n": 30
+      },
+      "path_optimality": {
+        "mean": 100.0,
+        "std": 0.0,
+        "median": 100.0,
+        "ci_low": 100.0,
+        "ci_high": 100.0,
+        "n": 30
+      }
+    },
+    "cbs_ts": {
+      "makespan": {
+        "mean": 297.2938,
+        "std": 2.2747,
+        "median": 297.965,
+        "ci_low": 296.4445,
+        "ci_high": 298.1431,
+        "n": 30
+      },
+      "avg_transfer_time": {
+        "mean": 27.4816,
+        "std": 1.8425,
+        "median": 26.875,
+        "ci_low": 26.7936,
+        "ci_high": 28.1695,
+        "n": 30
+      },
+      "amr_utilization": {
+        "mean": 88.0667,
+        "std": 5.0939,
+        "median": 89.62,
+        "ci_low": 86.1648,
+        "ci_high": 89.9685,
+        "n": 30
+      },
+      "throughput": {
+        "mean": 0.2549,
+        "std": 0.0193,
+        "median": 0.255,
+        "ci_low": 0.2477,
+        "ci_high": 0.2621,
+        "n": 30
+      },
+      "deadlock_count": {
+        "mean": 0.0,
+        "std": 0.0,
+        "median": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.0,
+        "n": 30
+      },
+      "path_optimality": {
+        "mean": 100.0,
+        "std": 0.0,
+        "median": 100.0,
+        "ci_low": 100.0,
+        "ci_high": 100.0,
+        "n": 30
+      }
+    }
+  }
+}

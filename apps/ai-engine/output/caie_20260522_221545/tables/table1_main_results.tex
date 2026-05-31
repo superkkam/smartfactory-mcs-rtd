@@ -1,0 +1,33 @@
+\begin{table*}[htbp]
+\centering
+\caption{Performance comparison of MAPF algorithms. Values: Mean $\pm$ SD (30 replications). Bold: best value per row. KW: Kruskal--Wallis significance (${}^{***}p<0.001$, ${}^{**}p<0.01$, ${}^{*}p<0.05$, ${}^{\text{ns}}$not significant).}
+\label{tab:main_results}
+\setlength{\tabcolsep}{4pt}
+\small
+\begin{tabular}{@{}llrrrrc@{}}
+\toprule
+\textbf{Scenario} & \textbf{Metric} & \textbf{A*} & \textbf{PPO-RL} & \textbf{CACTUS} & \textbf{CBS-TS} & \textbf{KW} \\
+\midrule
+\multirow{6}{*}{\begin{tabular}[c]{@{}l@{}}\textbf{Small (3 AGVs, 30 tasks)}\end{tabular}} & Makespan (s) & 290.39 $\pm$ 10.09 & \textbf{287.38 $\pm$ 11.29} & 290.75 $\pm$ 10.13 & 290.39 $\pm$ 10.09 & ns \\
+ & Avg. Transfer Time (s) & \textbf{28.45 $\pm$ 2.77} & 30.99 $\pm$ 3.68 & 28.74 $\pm$ 2.77 & \textbf{28.45 $\pm$ 2.77} & $**$ \\
+ & AMR Utilization (\%) & 79.44 $\pm$ 12.38 & \textbf{82.30 $\pm$ 11.12} & 79.79 $\pm$ 12.20 & 79.44 $\pm$ 12.38 & ns \\
+ & Throughput (tasks/s) & \textbf{0.08 $\pm$ 0.01} & 0.08 $\pm$ 0.01 & 0.08 $\pm$ 0.01 & \textbf{0.08 $\pm$ 0.01} & ns \\
+ & Deadlock Count & \textbf{0 $\pm$ 0} & \textbf{0 $\pm$ 0} & \textbf{0 $\pm$ 0} & \textbf{0 $\pm$ 0} & $***$ \\
+ & Path Optimality (\%) & \textbf{100.00 $\pm$ 0.00} & 94.41 $\pm$ 3.51 & 98.96 $\pm$ 1.32 & \textbf{100.00 $\pm$ 0.00} & $***$ \\
+\midrule
+\multirow{6}{*}{\begin{tabular}[c]{@{}l@{}}\textbf{Medium (5 AGVs, 60 tasks)}\end{tabular}} & Makespan (s) & 294.67 $\pm$ 4.45 & 295.39 $\pm$ 4.63 & \textbf{294.49 $\pm$ 4.81} & 294.67 $\pm$ 4.45 & ns \\
+ & Avg. Transfer Time (s) & \textbf{27.92 $\pm$ 1.90} & 30.26 $\pm$ 2.24 & 28.31 $\pm$ 1.97 & \textbf{27.92 $\pm$ 1.90} & $***$ \\
+ & AMR Utilization (\%) & 86.46 $\pm$ 7.01 & \textbf{87.75 $\pm$ 6.05} & 86.94 $\pm$ 6.81 & 86.46 $\pm$ 7.01 & ns \\
+ & Throughput (tasks/s) & \textbf{0.15 $\pm$ 0.01} & 0.14 $\pm$ 0.01 & 0.15 $\pm$ 0.01 & \textbf{0.15 $\pm$ 0.01} & $**$ \\
+ & Deadlock Count & \textbf{0 $\pm$ 0} & \textbf{0 $\pm$ 0} & \textbf{0 $\pm$ 0} & \textbf{0 $\pm$ 0} & $***$ \\
+ & Path Optimality (\%) & \textbf{100.00 $\pm$ 0.00} & 94.25 $\pm$ 2.19 & 98.88 $\pm$ 0.93 & \textbf{100.00 $\pm$ 0.00} & $***$ \\
+\midrule
+\multirow{6}{*}{\begin{tabular}[c]{@{}l@{}}\textbf{Large (8 AGVs, 100 tasks)}\end{tabular}} & Makespan (s) & 297.29 $\pm$ 2.27 & \textbf{296.06 $\pm$ 3.36} & 296.71 $\pm$ 2.42 & 297.29 $\pm$ 2.27 & ns \\
+ & Avg. Transfer Time (s) & \textbf{27.48 $\pm$ 1.84} & 29.51 $\pm$ 2.05 & 27.75 $\pm$ 1.76 & \textbf{27.48 $\pm$ 1.84} & $***$ \\
+ & AMR Utilization (\%) & 88.07 $\pm$ 5.09 & \textbf{88.76 $\pm$ 3.46} & 88.32 $\pm$ 4.74 & 88.07 $\pm$ 5.09 & ns \\
+ & Throughput (tasks/s) & \textbf{0.25 $\pm$ 0.02} & 0.24 $\pm$ 0.02 & 0.25 $\pm$ 0.02 & \textbf{0.25 $\pm$ 0.02} & $**$ \\
+ & Deadlock Count & \textbf{0 $\pm$ 0} & \textbf{0 $\pm$ 0} & \textbf{0 $\pm$ 0} & \textbf{0 $\pm$ 0} & $***$ \\
+ & Path Optimality (\%) & \textbf{100.00 $\pm$ 0.00} & 94.07 $\pm$ 1.61 & 98.73 $\pm$ 0.68 & \textbf{100.00 $\pm$ 0.00} & $***$ \\
+\bottomrule
+\end{tabular}
+\end{table*}

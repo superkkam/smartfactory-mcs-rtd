@@ -1,0 +1,18 @@
+\begin{table}[htbp]
+\centering
+\caption{Pairwise post-hoc comparison results (Wilcoxon signed-rank test, Holm--Bonferroni corrected) for Medium (5 AGVs, 60 tasks). Effect size: rank-biserial $r$. Significance: ${}^{***}p<0.001$, ${}^{**}p<0.01$, ${}^{*}p<0.05$.}
+\label{tab:significance}
+\small
+\begin{tabular}{@{}lcccccc@{}}
+\toprule
+\textbf{Metric} & \textbf{A* vs PPO-RL} & \textbf{A* vs CACTUS} & \textbf{A* vs CBS-TS} & \textbf{PPO-RL vs CACTUS} & \textbf{PPO-RL vs CBS-TS} & \textbf{CACTUS vs CBS-TS} \\
+\midrule
+Makespan (s) & $p=1.000$\\($r=0.10$) & $p=1.000$\\($r=0.30$) & $p=1.000$\\($r=0.00$) & $p=1.000$\\($r=0.24$) & $p=1.000$\\($r=0.10$) & $p=1.000$\\($r=0.30$) \\
+Avg. Transfer Time (s) & $p=0.000^{***}$\\($r=0.76$) & $p=0.031^{*}$\\($r=0.51$) & $p=1.000$\\($r=0.00$) & $p=0.000^{***}$\\($r=0.73$) & $p=0.000^{***}$\\($r=0.76$) & $p=0.031^{*}$\\($r=0.51$) \\
+AMR Utilization (\%) & $p=1.000$\\($r=0.11$) & $p=0.372$\\($r=0.37$) & $p=1.000$\\($r=0.00$) & $p=1.000$\\($r=0.12$) & $p=1.000$\\($r=0.11$) & $p=0.372$\\($r=0.37$) \\
+Throughput (tasks/s) & $p=0.000^{***}$\\($r=0.87$) & $p=0.223$\\($r=0.56$) & $p=1.000$\\($r=0.00$) & $p=0.000^{***}$\\($r=0.84$) & $p=0.000^{***}$\\($r=0.87$) & $p=0.223$\\($r=0.56$) \\
+Deadlock Count & $p=1.000$\\($r=0.00$) & $p=1.000$\\($r=0.00$) & $p=1.000$\\($r=0.00$) & $p=1.000$\\($r=0.00$) & $p=1.000$\\($r=0.00$) & $p=1.000$\\($r=0.00$) \\
+Path Optimality (\%) & $p=0.000^{***}$\\($r=0.87$) & $p=0.000^{***}$\\($r=0.87$) & $p=1.000$\\($r=0.00$) & $p=0.000^{***}$\\($r=0.87$) & $p=0.000^{***}$\\($r=0.87$) & $p=0.000^{***}$\\($r=0.87$) \\
+\bottomrule
+\end{tabular}
+\end{table}

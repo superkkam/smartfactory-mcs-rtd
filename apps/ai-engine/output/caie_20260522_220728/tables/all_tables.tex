@@ -1,0 +1,89 @@
+\documentclass[review]{elsarticle}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{xcolor}
+\usepackage{array}
+\usepackage{caption}
+\usepackage{amsmath}
+\begin{document}
+%% ============================================================
+%% CAIE 논문 표 — caie_tables.py 자동 생성
+%% ============================================================
+
+
+%% === Table 1: Main Results ===
+\begin{table*}[htbp]
+\centering
+\caption{Performance comparison of MAPF algorithms. Values: Mean $\pm$ SD (30 replications). Bold: best value per row. KW: Kruskal--Wallis significance (${}^{***}p<0.001$, ${}^{**}p<0.01$, ${}^{*}p<0.05$, ${}^{\text{ns}}$not significant).}
+\label{tab:main_results}
+\setlength{\tabcolsep}{4pt}
+\small
+\begin{tabular}{@{}llrrc@{}}
+\toprule
+\textbf{Scenario} & \textbf{Metric} & \textbf{A*} & \textbf{CBS-TS} & \textbf{KW} \\
+\midrule
+\multirow{6}{*}{\begin{tabular}[c]{@{}l@{}}\textbf{Small (3 AGVs, 30 tasks)}\end{tabular}} & Makespan (s) & \textbf{247.20 $\pm$ 46.41} & \textbf{247.20 $\pm$ 46.41} & ns \\
+ & Avg. Transfer Time (s) & \textbf{157.11 $\pm$ 45.14} & \textbf{157.11 $\pm$ 45.14} & ns \\
+ & AMR Utilization (\%) & \textbf{81.43 $\pm$ 6.08} & \textbf{81.43 $\pm$ 6.08} & ns \\
+ & Throughput (tasks/s) & \textbf{0.01 $\pm$ 0.00} & \textbf{0.01 $\pm$ 0.00} & ns \\
+ & Deadlock Count & \textbf{0 $\pm$ 0} & \textbf{0 $\pm$ 0} & ns \\
+ & Path Optimality (\%) & \textbf{100.00 $\pm$ 0.00} & \textbf{100.00 $\pm$ 0.00} & ns \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+%% === Table 2: Statistical Significance ===
+\begin{table}[htbp]
+\centering
+\caption{Pairwise post-hoc comparison results (Wilcoxon signed-rank test, Holm--Bonferroni corrected) for Small (3 AGVs, 30 tasks). Effect size: rank-biserial $r$. Significance: ${}^{***}p<0.001$, ${}^{**}p<0.01$, ${}^{*}p<0.05$.}
+\label{tab:significance}
+\small
+\begin{tabular}{@{}lc@{}}
+\toprule
+\textbf{Metric} & \textbf{A* vs CBS-TS} \\
+\midrule
+Makespan (s) & $p=1.000$\\($r=0.00$) \\
+Avg. Transfer Time (s) & $p=1.000$\\($r=0.00$) \\
+AMR Utilization (\%) & $p=1.000$\\($r=0.00$) \\
+Throughput (tasks/s) & $p=1.000$\\($r=0.00$) \\
+Deadlock Count & $p=1.000$\\($r=0.00$) \\
+Path Optimality (\%) & $p=1.000$\\($r=0.00$) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%% === Table 3: Algorithm Ranking ===
+\begin{table}[htbp]
+\centering
+\caption{Average rank of each algorithm across all scenarios and metrics (lower rank = better performance). Ranks computed per metric per scenario, then averaged over $3 \times 6 = 18$ evaluations.}
+\label{tab:ranking}
+\begin{tabular}{@{}clcccc@{}}
+\toprule
+\textbf{Rank} & \textbf{Algorithm} & \textbf{Avg. Rank} & \textbf{Best Metric Count} & \textbf{Wins} & \textbf{Losses} \\
+\midrule
+1 & \textbf{A*} & 1.00 & 6 & 0 & 0 \\
+2 & CBS-TS & 2.00 & 6 & 0 & 0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%% === Table: S1_Small Detail ===
+\begin{table}[htbp]
+\centering
+\caption{Detailed results for Small (3 AGVs, 30 tasks) scenario. Values: Mean $\pm$ SD [95\% CI]. Best in \textbf{bold}.}
+\label{tab:detail_s1_small}
+\small
+\begin{tabular}{@{}lrrc@{}}
+\toprule
+\textbf{Metric} & \textbf{A*} & \textbf{CBS-TS} & \textbf{KW} \\
+\midrule
+Makespan (s) & \textbf{247.20 $\pm$ 46.41 [131.89, 362.51]} & \textbf{247.20 $\pm$ 46.41 [131.89, 362.51]} & ns \\
+Avg. Transfer Time (s) & \textbf{157.11 $\pm$ 45.14 [44.97, 269.25]} & \textbf{157.11 $\pm$ 45.14 [44.97, 269.25]} & ns \\
+AMR Utilization (\%) & \textbf{81.43 $\pm$ 6.08 [66.33, 96.52]} & \textbf{81.43 $\pm$ 6.08 [66.33, 96.52]} & ns \\
+Throughput (tasks/s) & \textbf{0.01 $\pm$ 0.00 [0.01, 0.02]} & \textbf{0.01 $\pm$ 0.00 [0.01, 0.02]} & ns \\
+Deadlock Count & \textbf{0 $\pm$ 0 [0, 0]} & \textbf{0 $\pm$ 0 [0, 0]} & ns \\
+Path Optimality (\%) & \textbf{100.00 $\pm$ 0.00 [100.00, 100.00]} & \textbf{100.00 $\pm$ 0.00 [100.00, 100.00]} & ns \\
+\bottomrule
+\end{tabular}
+\end{table}
+\end{document}
