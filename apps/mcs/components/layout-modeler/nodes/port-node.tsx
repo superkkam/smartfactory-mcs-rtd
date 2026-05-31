@@ -22,30 +22,42 @@ export const PortNode = memo(function PortNode({
 }: NodeProps<PortNodeType>) {
   const badge = DIR_BADGE[data.direction];
 
+  const borderColor =
+    data.direction === 'IN'   ? (selected ? '#1d4ed8' : '#93c5fd') :
+    data.direction === 'OUT'  ? (selected ? '#c2410c' : '#fdba74') :
+                                (selected ? '#7c3aed' : '#c4b5fd');
+
   return (
     <div
-      className={`flex flex-col items-center gap-0.5 rounded border bg-white p-1 shadow-sm transition-shadow ${
-        selected ? 'border-indigo-500 shadow-md' : 'border-gray-300'
-      }`}
+      className="relative flex flex-col items-center gap-0.5 rounded-lg bg-white shadow-sm transition-shadow"
+      style={{
+        border: `1.5px solid ${borderColor}`,
+        padding: '4px 5px 3px',
+        minWidth: 44,
+      }}
     >
-      {/* 4방향 핸들 — AMR이 어느 방향으로든 연결 가능 */}
-      {/* ConnectionMode.Loose: source 핸들끼리 연결 가능 → 모든 방향 source 로 통일 */}
-      <Handle type="source" position={Position.Top}    id="t" className="!h-3 !w-3 !bg-indigo-400 !border-indigo-600" />
-      <Handle type="source" position={Position.Left}   id="l" className="!h-3 !w-3 !bg-indigo-400 !border-indigo-600" />
-      <Handle type="source" position={Position.Bottom} id="b" className="!h-3 !w-3 !bg-indigo-400 !border-indigo-600" />
-      <Handle type="source" position={Position.Right}  id="r" className="!h-3 !w-3 !bg-indigo-400 !border-indigo-600" />
+      {/* 4방향 핸들 — 최소 크기로 노드 심볼과 구분 */}
+      <Handle type="source" position={Position.Top}    id="t" className="!h-1.5 !w-1.5 !bg-slate-400 !border-slate-500 !-top-1" />
+      <Handle type="source" position={Position.Left}   id="l" className="!h-1.5 !w-1.5 !bg-slate-400 !border-slate-500 !-left-1" />
+      <Handle type="source" position={Position.Bottom} id="b" className="!h-1.5 !w-1.5 !bg-slate-400 !border-slate-500 !-bottom-1" />
+      <Handle type="source" position={Position.Right}  id="r" className="!h-1.5 !w-1.5 !bg-slate-400 !border-slate-500 !-right-1" />
 
-      <PortSymbol state="Online" width={20} height={20} />
+      {/* 포트 심볼 — 크기 키워서 명확하게 */}
+      <PortSymbol
+        state="Online"
+        width={28}
+        height={28}
+      />
 
-      <span className={`rounded border px-1 py-0.5 text-[7px] font-medium ${badge.style}`}>
+      {/* IN/OUT/BOTH 방향 배지 */}
+      <span className={`rounded border px-1 py-0.5 text-[7px] font-semibold leading-none ${badge.style}`}>
         {badge.label}
       </span>
-      {/* 1차 라벨: portId (PORT-001 등 친숙 코드) */}
-      <span className="max-w-[52px] truncate text-[7px] font-medium text-gray-600">{data.portId ?? data.name}</span>
-      {/* 2차 라벨: name (portId 와 다를 때만) */}
-      {data.name && data.name !== data.portId && (
-        <span className="max-w-[52px] truncate text-[6px] text-gray-400">{data.name}</span>
-      )}
+
+      {/* portId 라벨 */}
+      <span className="max-w-[56px] truncate text-center text-[6.5px] font-medium text-gray-500 leading-tight">
+        {data.portId ?? data.name}
+      </span>
     </div>
   );
 });

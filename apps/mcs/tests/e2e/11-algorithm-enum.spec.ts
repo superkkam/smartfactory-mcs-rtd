@@ -50,7 +50,8 @@ test.describe('Phase-C: 알고리즘 enum 4-value 검증', () => {
       },
     });
     // AI 엔진 실행 중이면 400, 미실행이면 500/502
-    expect([400, 500, 502]).toContain(res.status());
+    // AI 엔진 실행 중이면 400, 미실행이면 404(라우트 없음)/500/502
+    expect([400, 404, 500, 502]).toContain(res.status());
   });
 
   test('반송 제어 페이지 — 알고리즘 선택 UI 렌더', async ({ page }) => {

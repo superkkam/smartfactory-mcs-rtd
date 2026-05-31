@@ -1,6 +1,6 @@
 'use client';
 
-import { Eye, EyeOff, Save, ChevronDown } from 'lucide-react';
+import { Eye, EyeOff, Save, ChevronDown, RefreshCw } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -14,6 +14,8 @@ interface ToolbarProps {
   relationsVisible:  boolean;
   onToggleRelations: () => void;
   onSave:            () => void;
+  onResync?:         () => void;
+  isResyncing?:      boolean;
   nodeCount:         number;
   edgeCount:         number;
   /** 현재 편집 중인 레이아웃 id (null = 신규) */
@@ -34,6 +36,8 @@ export function Toolbar({
   relationsVisible,
   onToggleRelations,
   onSave,
+  onResync,
+  isResyncing,
   nodeCount,
   edgeCount,
   currentLayoutId,
@@ -107,6 +111,19 @@ export function Toolbar({
         <Save className="h-3.5 w-3.5" />
         저장
       </button>
+
+      {/* 경로 관계 재동기화 (양방향 엣지 수정 후 DB 반영) */}
+      {onResync && currentLayoutId && (
+        <button
+          onClick={onResync}
+          disabled={isResyncing}
+          className="flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-100 disabled:opacity-50"
+          title="저장된 JSON으로 mcs_transfer_relation 재동기화 (IN 포트 도달 가능성 복구)"
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${isResyncing ? 'animate-spin' : ''}`} />
+          {isResyncing ? '동기화 중...' : '관계 재동기화'}
+        </button>
+      )}
 
       {/* 레이아웃 통계 */}
       <div className="ml-auto flex items-center gap-3 text-[10px] text-gray-400">

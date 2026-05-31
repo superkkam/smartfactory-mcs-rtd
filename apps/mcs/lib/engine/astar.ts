@@ -6,14 +6,16 @@ import type { GraphNode, AstarResult, RouteStep } from './types';
  * Heuristic: 좌표 정보가 없으므로 h=0 (Dijkstra와 동일, admissible 보장)
  * 실제 논문에서 "A* Baseline" = uniform-cost search로 표기
  *
- * @param graph  unitId(DB uuid) → GraphNode 맵
- * @param startId  출발 유닛 DB uuid
- * @param goalId   도착 유닛 DB uuid
+ * @param graph         unitId(DB uuid) → GraphNode 맵
+ * @param startId       출발 유닛 DB uuid
+ * @param goalId        도착 유닛 DB uuid
+ * @param blockedNodes  런타임 장애물 유닛 ID 집합 (시뮬레이션 중 랜덤 생성)
  */
 export function runAstar(
   graph: Map<string, GraphNode>,
   startId: string,
   goalId: string,
+  blockedNodes: Set<string> = new Set(),
 ): AstarResult {
   if (!graph.has(startId)) throw new Error(`출발 노드 없음: ${startId}`);
   if (!graph.has(goalId))  throw new Error(`목적 노드 없음: ${goalId}`);
@@ -44,13 +46,8 @@ export function runAstar(
     inOpen.delete(current.id);
 
     if (current.id === goalId) {
-      // 경로 역추적
       const path = reconstructPath(cameFrom, gScore, goalId);
-      return {
-        path,
-        totalCost: gScore.get(goalId) ?? 0,
-        exploredCount,
-      };
+      return { path, totalCost: gScore.get(goalId) ?? 0, exploredCount };
     }
 
     closedSet.add(current.id);
@@ -60,6 +57,11 @@ export function runAstar(
     if (!node) continue;
 
     for (const edge of node.neighbors) {
+      // 장애물 셀은 건너뜀 (출발/도착은 장애물이어도 허용)
+      if (
+        blockedNodes.has(edge.toUnitId) &&
+        edge.toUnitId !== goalId
+      ) continue;
       if (closedSet.has(edge.toUnitId)) continue;
 
       const tentativeG = (gScore.get(current.id) ?? Infinity) + edge.weight;
@@ -68,7 +70,7 @@ export function runAstar(
       if (tentativeG < existingG) {
         cameFrom.set(edge.toUnitId, current.id);
         gScore.set(edge.toUnitId, tentativeG);
-        const fCost = tentativeG; // h = 0 (Dijkstra 동등)
+        const fCost = tentativeG;
 
         if (!inOpen.has(edge.toUnitId)) {
           openSet.push({ id: edge.toUnitId, fCost });
@@ -78,7 +80,7 @@ export function runAstar(
     }
   }
 
-  throw new Error(`경로 없음: ${startId} → ${goalId}`);
+  throw new Error(`경로 없음: ${startId} → ${goalId} (장애물 우회 불가)`);
 }
 
 /** 부모 노드 맵에서 전체 경로 역추적 */

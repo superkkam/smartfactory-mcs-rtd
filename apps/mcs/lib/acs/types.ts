@@ -54,6 +54,8 @@ export interface AcsVehicle {
   lastHopAt: number;
   /** 마지막 상태 변경 timestamp (ms) */
   updatedAt: number;
+  /** 반송 완료 후 홈(충전소)으로 귀환 중 — Acquiring 단계에서 캐리어 픽업 없이 Idle 복귀 */
+  returningHome?: boolean;
 }
 
 /** ACS 전체 런타임 상태 */

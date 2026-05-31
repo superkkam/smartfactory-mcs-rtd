@@ -1,5 +1,4 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { createAdminClient } from '@/lib/supabase/server';
 import type { GraphNode } from './types';
 
 /**
@@ -12,9 +11,20 @@ import type { GraphNode } from './types';
  *
  * @returns unitId(DB uuid) → GraphNode 맵
  */
-export async function loadGraph(layoutId: string): Promise<Map<string, GraphNode>> {
-  // RLS 우회: API 라우트에서 세션 없이 호출되므로 service_role 클라이언트 사용
-  const supabase = createAdminClient();
+export async function loadGraph(
+  layoutId: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  injectedClient?: SupabaseClient<any>,
+): Promise<Map<string, GraphNode>> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let supabase: SupabaseClient<any>;
+  if (injectedClient) {
+    supabase = injectedClient;
+  } else {
+    // 서버 전용 dynamic import (클라이언트 번들에서 next/headers 로드 방지)
+    const { createAdminClient } = await import('@/lib/supabase/server');
+    supabase = createAdminClient();
+  }
 
   // 전이 관계 전체 로드
   const { data: relations, error: relErr } = await supabase
@@ -127,7 +137,7 @@ async function recoverRelationsFromJson(
     if (dbId) rfToUnitId.set(rfId, dbId);
   }
 
-  // transfer 엣지 → 전이 관계 목록
+  // transfer 엣지 → 전이 관계 목록 (양방향 엣지 markerStart 존재 시 역방향도 추가)
   const relations: Array<{ layout_id: string; departure_unit_id: string; arrival_unit_id: string; weight: number }> = [];
   for (const edge of edges) {
     if (edge.type !== 'transfer') continue;
@@ -136,6 +146,10 @@ async function recoverRelationsFromJson(
     if (!depId || !arrId) continue;
     const weight = Number((edge.data?.weight as number | undefined) ?? 1.0);
     relations.push({ layout_id: layoutId, departure_unit_id: depId, arrival_unit_id: arrId, weight });
+    // markerStart 존재 → 양방향 엣지: 역방향도 복구
+    if ((edge as Record<string, unknown>).markerStart) {
+      relations.push({ layout_id: layoutId, departure_unit_id: arrId, arrival_unit_id: depId, weight });
+    }
   }
 
   if (relations.length === 0) {

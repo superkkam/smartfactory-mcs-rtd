@@ -2,9 +2,10 @@
 
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { RefreshCw, SendHorizonal } from 'lucide-react';
+import { RefreshCw, SendHorizonal, Shuffle, X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge }  from '@/components/ui/badge';
 import { RtdStatusBadge }    from '@/components/transfer-control/rtd-status-badge';
 import { RouteSearchForm }   from '@/components/transfer-control/route-search-form';
 import { MacroCommandCard }  from '@/components/transfer-control/macro-command-card';
@@ -20,7 +21,13 @@ interface AstarResponse {
   path:          AstarPathStep[];
   totalCost:     number;
   exploredCount: number;
+  blockedNodes?: string[];
   error?:        string;
+}
+
+interface BlockedNode {
+  unitId:    string;
+  unitLabel: string;
 }
 
 export default function TransferControlPage() {
@@ -43,6 +50,34 @@ export default function TransferControlPage() {
   const [relationsMissing, setRelationsMissing] = useState(false);
   /** 혼잡도 맵: { unitLabel: congestionFactor } — CongestionToggle에서 주입 */
   const [congestionWeights, setCongestionWeights] = useState<Record<string, number> | null>(null);
+  /** 런타임 랜덤 장애물 — 시뮬레이션/RTD 장애물 주입 */
+  const [blockedNodes,    setBlockedNodes]    = useState<BlockedNode[]>([]);
+  const [isObstacleLoading, setIsObstacleLoading] = useState(false);
+
+  /** 랜덤 장애물 생성 — 출발/도착 노드 제외 */
+  const handleGenerateObstacles = async () => {
+    if (!layoutId) { toast.error('레이아웃을 먼저 선택하세요.'); return; }
+    setIsObstacleLoading(true);
+    try {
+      const res = await fetch('/api/obstacles', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          layoutId,
+          count:          5,
+          excludeUnitIds: [fromUnitId, toUnitId].filter(Boolean),
+        }),
+      });
+      const data = await res.json() as { blockedNodes?: BlockedNode[]; error?: string };
+      if (!res.ok || data.error) throw new Error(data.error ?? '장애물 생성 실패');
+      setBlockedNodes(data.blockedNodes ?? []);
+      toast.info(`랜덤 장애물 ${data.blockedNodes?.length ?? 0}개 생성 — 다시 경로 탐색하세요.`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '장애물 생성 실패');
+    } finally {
+      setIsObstacleLoading(false);
+    }
+  };
 
   const handleSearch = async (from: string, to: string) => {
     setFromUnitId(from);
@@ -58,11 +93,18 @@ export default function TransferControlPage() {
     setAstarResult(null);
     setAiResult(null);
 
+    const blockedIds = blockedNodes.map((n) => n.unitId);
+
     const [astarRes, aiRes] = await Promise.allSettled([
       fetch('/api/astar', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ layoutId, sourceUnitId: fromUnitId, destUnitId: toUnitId }),
+        body:    JSON.stringify({
+          layoutId,
+          sourceUnitId: fromUnitId,
+          destUnitId:   toUnitId,
+          blockedNodes: blockedIds,
+        }),
       }).then(async (r) => {
         const data: AstarResponse = await r.json();
         if (!r.ok || data.error) throw new Error(data.error ?? '경로 탐색 실패');
@@ -204,6 +246,63 @@ export default function TransferControlPage() {
       {/* 혼잡도 시뮬레이션 토글 */}
       <CongestionToggle onChange={setCongestionWeights} />
 
+      {/* 런타임 장애물 패널 */}
+      <Card>
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-semibold text-gray-800">
+              런타임 장애물 시뮬레이션
+            </CardTitle>
+            <div className="flex items-center gap-2">
+              {blockedNodes.length > 0 && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 gap-1 text-xs text-gray-500 hover:text-red-600"
+                  onClick={() => setBlockedNodes([])}
+                >
+                  <X className="h-3 w-3" /> 장애물 초기화
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 gap-1.5 text-xs"
+                onClick={handleGenerateObstacles}
+                disabled={isObstacleLoading || !layoutId}
+              >
+                <Shuffle className={`h-3.5 w-3.5 ${isObstacleLoading ? 'animate-spin' : ''}`} />
+                {isObstacleLoading ? '생성 중...' : '랜덤 장애물 생성 (5개)'}
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <p className="mb-2 text-[11px] text-gray-400">
+            반송 중 랜덤 셀 차단 → A* / PPO / CACTUS / CBS-TS 우회 경로 비교 (논문 실험 시나리오)
+          </p>
+          {blockedNodes.length === 0 ? (
+            <p className="text-xs text-gray-400 italic">장애물 없음 — 위 버튼으로 랜덤 생성</p>
+          ) : (
+            <div className="flex flex-wrap gap-1.5">
+              {blockedNodes.map((n) => (
+                <Badge
+                  key={n.unitId}
+                  variant="outline"
+                  className="gap-1 border-red-200 bg-red-50 text-[10px] text-red-700"
+                >
+                  🚧 {n.unitLabel}
+                  <button
+                    className="ml-0.5 opacity-60 hover:opacity-100"
+                    onClick={() => setBlockedNodes((prev) => prev.filter((x) => x.unitId !== n.unitId))}
+                  >×</button>
+                </Badge>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* 경로 탐색 폼 */}
       <Card>
         <CardHeader className="pb-3">
@@ -243,6 +342,7 @@ export default function TransferControlPage() {
                 aiPath={aiResult?.route}
                 aiTotalTimeMs={aiResult?.route.reduce((acc, s) => acc + s.predictedTimeMs, 0)}
                 isAiLoading={isAiLoading}
+                blockedNodes={blockedNodes}
               />
             </CardContent>
           </Card>

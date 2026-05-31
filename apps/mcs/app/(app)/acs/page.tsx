@@ -67,6 +67,7 @@ export default function AcsPage() {
     equipments,
     units,
     carriers,
+    layoutId: layoutId ?? undefined,
   });
 
   const mobileVehicles = [...acsState.vehicles.values()];
@@ -156,7 +157,7 @@ export default function AcsPage() {
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {mobileVehicles.map((v) => (
-                <VehicleCard key={v.equipmentId} vehicle={v} />
+                <VehicleCard key={v.equipmentId} vehicle={v} units={units} />
               ))}
             </div>
           )}

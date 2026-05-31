@@ -27,6 +27,7 @@ import { PortNode }         from './nodes/port-node';
 import { PathNode }         from './nodes/path-node';
 import { AgvNode }          from './nodes/agv-node';
 import { ChargeNode }       from './nodes/charge-node';
+import { ObstacleNode }     from './nodes/obstacle-node';
 import { TransferEdgeComponent } from './edges/transfer-edge';
 import { CanvasContextMenu }     from './canvas-context-menu';
 import { BatchRouteDialog }      from './batch-route-dialog';
@@ -43,12 +44,13 @@ import type {
 /* 모듈 레벨 상수 — 매 렌더마다 재생성 방지 */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const NODE_TYPES: NodeTypes = {
-  stocker: StockerGroupNode as any,
-  process: ProcessGroupNode as any,
-  port:    PortNode         as any,
-  node:    PathNode         as any,
-  agv:     AgvNode          as any,
-  charge:  ChargeNode       as any,
+  stocker:   StockerGroupNode as any,
+  process:   ProcessGroupNode as any,
+  port:      PortNode         as any,
+  node:      PathNode         as any,
+  agv:       AgvNode          as any,
+  charge:    ChargeNode       as any,
+  obstacle:  ObstacleNode     as any,
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

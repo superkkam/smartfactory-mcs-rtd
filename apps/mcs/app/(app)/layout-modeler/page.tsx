@@ -53,6 +53,7 @@ export default function LayoutModelerPage() {
   const [nameDialogOpen, setNameDialogOpen] = useState(false);
   const [pendingDesignName, setPendingDesignName] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isResyncing, setIsResyncing] = useState(false);
 
   /* 저장 대기 중인 데이터 (Dialog 확인 후 실제 저장) */
   const pendingSaveDataRef = useRef<SaveResult | null>(null);
@@ -188,6 +189,26 @@ export default function LayoutModelerPage() {
     void executeSave(name, saveData);
   }, [pendingDesignName, executeSave]);
 
+  /* 전이 관계 재동기화 — 저장된 JSON으로 DB를 재구성 (양방향 엣지 복구) */
+  const handleResync = useCallback(async () => {
+    if (!currentLayoutId) return;
+    setIsResyncing(true);
+    try {
+      const res = await fetch('/api/layouts/sync', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ layoutId: currentLayoutId }),
+      });
+      const data = await res.json() as { ok?: boolean; error?: string };
+      if (!res.ok || data.error) throw new Error(data.error ?? '재동기화 실패');
+      toast.success('경로 관계 재동기화 완료 — IN 포트 도달 가능성이 복구되었습니다.');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '재동기화 실패');
+    } finally {
+      setIsResyncing(false);
+    }
+  }, [currentLayoutId]);
+
   /* 버전(레이아웃) 선택 */
   const handleVersionChange = useCallback((layoutId: string) => {
     if (layoutId === '__new__') {
@@ -251,6 +272,8 @@ export default function LayoutModelerPage() {
         relationsVisible={relationsVisible}
         onToggleRelations={() => setRelationsVisible((v) => !v)}
         onSave={handleSave}
+        onResync={handleResync}
+        isResyncing={isResyncing}
         nodeCount={nodeCount}
         edgeCount={edgeCount}
         currentLayoutId={currentLayoutId}

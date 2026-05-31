@@ -76,6 +76,34 @@ export function useActiveMacroCommands() {
   });
 }
 
+/**
+ * ack 수신 시각 이후에 생성된 RTD 매크로 조회 (3초 폴링)
+ * DispatchResultPanel 전용: LoadRequest ACK 직후부터 해당 반송 명령만 추적.
+ * buffer 30s — RTD → MCS DISPATCH_RESULT 처리 지연 흡수.
+ */
+export function useRtdMacroSince(ackAt: number | null) {
+  return useQuery({
+    queryKey: [QUERY_KEY, 'rtd_since', ackAt],
+    queryFn: async () => {
+      if (!ackAt) return null;
+      const supabase = createClient();
+      const since = new Date(ackAt - 30_000).toISOString();
+      const { data, error } = await supabase
+        .from('mcs_macro_command')
+        .select('*')
+        .eq('source_system', 'RTD')
+        .gte('created_at', since)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data ? toEntity(data) : null;
+    },
+    enabled: !!ackAt,
+    refetchInterval: 3000,
+  });
+}
+
 /** 매크로 명령 단건 조회 */
 export function useMacroCommand(id: string) {
   return useQuery({

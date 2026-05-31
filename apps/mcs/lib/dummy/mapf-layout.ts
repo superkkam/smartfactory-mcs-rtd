@@ -1,18 +1,18 @@
 /**
  * MAPF (Multi-Agent Path Finding) 시나리오용 그리드 레이아웃
  *
- * 구성 (8×8 그리드):
- *  - Path Node × 64  (ND-R1C1 ~ ND-R8C8, 4-connected 양방향)
+ * 구성 (8×8 그리드, 완전 연결):
+ *  - Path Node × 64  (ND-R1C1 ~ ND-R8C8, 4-connected 양방향 — 모든 셀 연결)
  *  - Stocker   × 4   (모서리 배치, STK-M1~M4)
  *  - Process   × 6   (상단 3 + 하단 3, PROC-M1~M6)
  *  - Charge    × 4   (좌우 중간, CHG-M1~M4)
- *  - Obstacle  × 8   (중앙 장애물 블록 — 충돌 회피 학습용)
  *  - AGV       × 8   (MAPF 최소 스케일, AMR-M01~M08)
  *
- * 목적:
- *  - CACTUS (PPO+QMIX CTDE) 다중 에이전트 학습 환경 시각화
- *  - CBS-TS (MILP+CBS) 작업 순서 / 충돌 검출 시뮬레이션
- *  - 이종 AMR(TYPE_A/B/C) 호환성 경로 분리 검증
+ * 장애물 설계 방침:
+ *  - 레이아웃에는 장애물 없음 (완전 연결 그리드)
+ *  - 장애물은 시뮬레이션 런타임에 랜덤 생성 → blockedNodes 파라미터로 전달
+ *  - A* / PPO / CACTUS / CBS-TS 알고리즘이 동일 장애물 상황에서
+ *    어떻게 우회하는지 비교 (논문 실험 시나리오)
  *
  * 좌표 체계:
  *  그리드 원점: (200, 200), 셀 크기: 120px × 120px
@@ -27,7 +27,6 @@ import type {
   PathNodeData,
   ChargeNodeData,
   AgvNodeData,
-  ObstacleNodeData,
   TransferEdgeData,
 } from '@/components/layout-modeler/types';
 
@@ -41,14 +40,6 @@ const ORIGIN_X = 200;   // 그리드 시작 X
 const ORIGIN_Y = 200;   // 그리드 시작 Y
 const EQ_MARGIN = 160;  // 장비 여백 (그리드 외곽)
 
-/* 장애물 위치 (row, col), 0-based */
-const OBSTACLE_CELLS = new Set<string>([
-  '2,3', '2,4',  // 상단 중앙 장애물 블록
-  '3,3', '3,4',
-  '4,3', '4,4',  // 중앙 장애물 블록
-  '5,3', '5,4',
-]);
-
 /* ────────────────────────────────────────────────
    헬퍼
 ──────────────────────────────────────────────── */
@@ -59,9 +50,6 @@ function ndId(r: number, c: number): string {
 }
 function ndCode(r: number, c: number): string {
   return `MAPF-ND-R${r + 1}C${c + 1}`;
-}
-function isObstacle(r: number, c: number): boolean {
-  return OBSTACLE_CELLS.has(`${r},${c}`);
 }
 function gridX(c: number): number {
   return ORIGIN_X + c * CELL;
@@ -81,54 +69,43 @@ const eid = () => `mapf-e${_edgeSeq++}`;
 const _nodes: Node[] = [];
 const _edges: Edge[] = [];
 
-/* 1. Path Node 그리드 */
+/* 1. Path Node 그리드 — 64개 전체, 장애물 없음 */
 for (let r = 0; r < GRID_ROWS; r++) {
   for (let c = 0; c < GRID_COLS; c++) {
-    if (isObstacle(r, c)) {
-      // 장애물 노드 (통행 불가 마커)
-      _nodes.push({
-        id:       ndId(r, c),
-        type:     'obstacle',
-        position: { x: gridX(c), y: gridY(r) },
-        data:     { nodeId: ndCode(r, c), label: '✕' } satisfies ObstacleNodeData,
-      });
-    } else {
-      _nodes.push({
-        id:       ndId(r, c),
-        type:     'node',
-        position: { x: gridX(c), y: gridY(r) },
-        data:     { nodeId: ndCode(r, c) } satisfies PathNodeData,
-      });
-    }
+    _nodes.push({
+      id:       ndId(r, c),
+      type:     'node',
+      position: { x: gridX(c), y: gridY(r) },
+      data:     { nodeId: ndCode(r, c) } satisfies PathNodeData,
+    });
   }
 }
 
-/* 2. 4-connected 양방향 엣지 (장애물 제외) */
+/* 2. 4-connected 양방향 엣지 — 모든 인접 셀 완전 연결 */
 for (let r = 0; r < GRID_ROWS; r++) {
   for (let c = 0; c < GRID_COLS; c++) {
-    if (isObstacle(r, c)) continue;
     // 오른쪽 이웃
-    if (c + 1 < GRID_COLS && !isObstacle(r, c + 1)) {
+    if (c + 1 < GRID_COLS) {
       _edges.push({
-        id:         eid(),
-        type:       'transfer',
-        source:     ndId(r, c),
-        target:     ndId(r, c + 1),
-        markerEnd:  BIDIR,
+        id:          eid(),
+        type:        'transfer',
+        source:      ndId(r, c),
+        target:      ndId(r, c + 1),
+        markerEnd:   BIDIR,
         markerStart: BIDIR,
-        data:       { weight: 1, hidden: false } as TransferEdgeData,
+        data:        { weight: 1, hidden: false } as TransferEdgeData,
       });
     }
     // 아래쪽 이웃
-    if (r + 1 < GRID_ROWS && !isObstacle(r + 1, c)) {
+    if (r + 1 < GRID_ROWS) {
       _edges.push({
-        id:         eid(),
-        type:       'transfer',
-        source:     ndId(r, c),
-        target:     ndId(r + 1, c),
-        markerEnd:  BIDIR,
+        id:          eid(),
+        type:        'transfer',
+        source:      ndId(r, c),
+        target:      ndId(r + 1, c),
+        markerEnd:   BIDIR,
         markerStart: BIDIR,
-        data:       { weight: 1, hidden: false } as TransferEdgeData,
+        data:        { weight: 1, hidden: false } as TransferEdgeData,
       });
     }
   }
@@ -305,12 +282,11 @@ export const MAPF_EDGES: Edge[] = _edges;
 
 /** MAPF 시나리오 메타데이터 */
 export const MAPF_META = {
-  designName: 'MAPF Grid 8×8',
-  designId:   'MAPF-LAYOUT-001',
-  gridRows:   GRID_ROWS,
-  gridCols:   GRID_COLS,
-  agvCount:   agvDefs.length,
-  amrTypes:   { TYPE_A: 3, TYPE_B: 3, TYPE_C: 2 },
-  obstacles:  OBSTACLE_CELLS.size,
-  description: '8×8 그리드 MAPF 시나리오 (CACTUS/CBS-TS 평가용)',
+  designName:  'MAPF Grid 8×8',
+  designId:    'MAPF-LAYOUT-001',
+  gridRows:    GRID_ROWS,
+  gridCols:    GRID_COLS,
+  agvCount:    agvDefs.length,
+  amrTypes:    { TYPE_A: 3, TYPE_B: 3, TYPE_C: 2 },
+  description: '8×8 완전 연결 그리드 MAPF 시나리오 — 장애물은 런타임 랜덤 생성',
 };

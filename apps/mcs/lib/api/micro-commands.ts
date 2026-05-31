@@ -30,6 +30,39 @@ function toRow(entity: Partial<MicroCommand>) {
   };
 }
 
+/**
+ * 특정 AMR 이 현재 실행 중인 마이크로 명령 전체 조회 (2초 폴링)
+ * InProgress 인 micro → 부모 macro ID 확인 → 해당 macro 의 전체 sequence 반환
+ * leader/follower 탭 무관하게 DB 를 직접 읽으므로 항상 정확한 진행 상태를 보장.
+ */
+export function useActiveMicroCommandsByExecutor(equipmentId: string) {
+  return useQuery({
+    queryKey: [QUERY_KEY, 'by_executor', equipmentId],
+    queryFn: async () => {
+      const supabase = createClient();
+      // 1단계: 현재 이 AMR 이 실행 중인(InProgress) micro 에서 macro_command_id 추출
+      const { data: active } = await supabase
+        .from('mcs_micro_command')
+        .select('macro_command_id')
+        .eq('executor_equipment_id', equipmentId)
+        .eq('state', 'InProgress')
+        .limit(1);
+      const macroId = (active?.[0] as Record<string, unknown> | undefined)?.macro_command_id as string | undefined;
+      if (!macroId) return [];
+      // 2단계: 해당 macro 의 전체 micro command 시퀀스 (Completed 포함)
+      const { data, error } = await supabase
+        .from('mcs_micro_command')
+        .select('*')
+        .eq('macro_command_id', macroId)
+        .order('sequence');
+      if (error) throw error;
+      return (data ?? []).map(toEntity);
+    },
+    enabled: !!equipmentId,
+    refetchInterval: 2000,
+  });
+}
+
 /** 특정 매크로 명령의 마이크로 명령 시퀀스 조회 (3초 폴링) */
 export function useMicroCommandsByMacro(macroCommandId: string) {
   return useQuery({

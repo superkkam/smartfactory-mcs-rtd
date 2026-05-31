@@ -19,26 +19,37 @@ import { useLayout } from '@/lib/api/layouts';
 import { useLayoutMonitor } from '@/lib/api/layout-monitor';
 import { useCarrierAnimations } from '@/lib/monitor/use-carrier-animations';
 import { getEquipmentMiniMapColor } from '@/lib/monitor/state-colors';
+import { unitIdToRfNodeId } from '@/lib/monitor/unit-mapping';
 import { ProcessGroupNode } from '@/components/layout-modeler/nodes/process-group-node';
 import { StockerGroupNode } from '@/components/layout-modeler/nodes/stocker-group-node';
 import { PortNode }         from '@/components/layout-modeler/nodes/port-node';
 import { PathNode }         from '@/components/layout-modeler/nodes/path-node';
 import { ChargeNode }       from '@/components/layout-modeler/nodes/charge-node';
+import { ObstacleNode }     from '@/components/layout-modeler/nodes/obstacle-node';
 import { TransferEdgeComponent } from '@/components/layout-modeler/edges/transfer-edge';
 import { CarrierNode }     from '@/components/dashboard/carrier-node';
 import { DashboardAgvNode } from '@/components/dashboard/agv-node';
 import type { StockerNodeData, ProcessNodeData, PortNodeData, PathNodeData } from '@/components/layout-modeler/types';
+import type { AcsVehicle } from '@/lib/acs/types';
+
+export interface SelectedPortInfo {
+  portId:      string;
+  equipmentId: string;
+  direction:   string;
+  nodeId:      string;
+}
 
 /** React Flow 커스텀 노드/엣지 타입 등록 (대시보드 전용) */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const NODE_TYPES: NodeTypes = {
-  stocker: StockerGroupNode  as any,
-  process: ProcessGroupNode  as any,
-  port:    PortNode          as any,
-  node:    PathNode          as any,
-  charge:  ChargeNode        as any,
-  agv:     DashboardAgvNode  as any,  // 라벨 없는 SVG 전용 렌더러
-  carrier: CarrierNode       as any,
+  stocker:  StockerGroupNode  as any,
+  process:  ProcessGroupNode  as any,
+  port:     PortNode          as any,
+  node:     PathNode          as any,
+  charge:   ChargeNode        as any,
+  obstacle: ObstacleNode      as any,
+  agv:      DashboardAgvNode  as any,  // 라벨 없는 SVG 전용 렌더러
+  carrier:  CarrierNode       as any,
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -55,7 +66,11 @@ const CONNECTION_BADGE: Record<string, { style: string; label: string }> = {
 };
 
 interface LayoutViewerProps {
-  layoutId: string | undefined;
+  layoutId:          string | undefined;
+  onPortClick?:      (info: SelectedPortInfo) => void;
+  acsVehicles?:      Map<string, AcsVehicle>;
+  selectedVehicleId?: string;
+  onAgvClick?:       (equipmentId: string) => void;
 }
 
 /**
@@ -63,7 +78,13 @@ interface LayoutViewerProps {
  * - DB에서 지정된 layoutId의 노드/엣지 로드
  * - 장비 상태 및 캐리어 위치를 실시간으로 덮어씀
  */
-export function LayoutViewer({ layoutId }: LayoutViewerProps) {
+export function LayoutViewer({
+  layoutId,
+  onPortClick,
+  acsVehicles,
+  selectedVehicleId,
+  onAgvClick,
+}: LayoutViewerProps) {
   const { data: layout, isLoading: layoutLoading } = useLayout(layoutId ?? '');
   const {
     equipments,
@@ -141,10 +162,40 @@ export function LayoutViewer({ layoutId }: LayoutViewerProps) {
     [mergedNodes, animatedNodes],
   );
 
+  // 선택된 차량의 남은 경로 오버레이 엣지
+  const pathOverlayEdges = useMemo<Edge[]>(() => {
+    if (!selectedVehicleId || !acsVehicles) return [];
+    const vehicle = acsVehicles.get(selectedVehicleId);
+    if (!vehicle || vehicle.currentPath.length < 2) return [];
+
+    const remaining = vehicle.currentPath.slice(vehicle.pathIndex);
+    const overlayEdges: Edge[] = [];
+
+    for (let i = 0; i < remaining.length - 1; i++) {
+      const fromRfId = unitIdToRfNodeId(remaining[i], units, baseNodes);
+      const toRfId   = unitIdToRfNodeId(remaining[i + 1], units, baseNodes);
+      if (!fromRfId || !toRfId) continue;
+      overlayEdges.push({
+        id:       `path-overlay-${i}`,
+        source:   fromRfId,
+        target:   toRfId,
+        type:     'default',
+        animated: true,
+        style:    { stroke: '#6366f1', strokeWidth: 3, opacity: 0.85 },
+        zIndex:   10,
+      });
+    }
+
+    return overlayEdges;
+  }, [selectedVehicleId, acsVehicles, units, baseNodes]);
+
   // 릴레이션 표시 토글: React Flow 네이티브 hidden 속성 사용 (가장 확실)
   const edges = useMemo<Edge[]>(
-    () => rawEdges.map((e) => ({ ...e, hidden: !relationsVisible })),
-    [rawEdges, relationsVisible],
+    () => [
+      ...rawEdges.map((e) => ({ ...e, hidden: !relationsVisible })),
+      ...pathOverlayEdges,
+    ],
+    [rawEdges, relationsVisible, pathOverlayEdges],
   );
 
   const isLoading = layoutLoading || monitorLoading;
@@ -178,13 +229,29 @@ export function LayoutViewer({ layoutId }: LayoutViewerProps) {
         connectionMode={ConnectionMode.Loose}
         nodesDraggable={false}
         nodesConnectable={false}
-        elementsSelectable={false}
+        elementsSelectable={!!(onPortClick || onAgvClick)}
         panOnDrag
         zoomOnScroll
         minZoom={0.3}
         maxZoom={3}
         proOptions={{ hideAttribution: true }}
         onInit={(inst) => { rfRef.current = inst; }}
+        onNodeClick={(_evt, node) => {
+          if (node.type === 'agv' && onAgvClick) {
+            // AGV 노드 id 형식: "amr-{equipment DB uuid}"
+            const equipmentId = node.id.startsWith('amr-') ? node.id.slice(4) : node.id;
+            onAgvClick(equipmentId);
+            return;
+          }
+          if (node.type !== 'port' || !onPortClick) return;
+          const d = node.data as PortNodeData;
+          onPortClick({
+            portId:      (d.portId ?? d.name ?? node.id) as string,
+            equipmentId: (d.parentEquipmentId ?? '') as string,
+            direction:   (d.direction ?? '') as string,
+            nodeId:      node.id,
+          });
+        }}
       >
         <Background color="#e5e7eb" gap={20} size={1} />
         <Controls showInteractive={false} />

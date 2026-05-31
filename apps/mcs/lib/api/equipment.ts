@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { Equipment } from '@workspace/types/mcs';
 
@@ -123,6 +124,50 @@ export function useUpdateEquipment() {
 }
 
 /** 장비 삭제 */
+/**
+ * 특정 AGV의 실시간 location_id 구독
+ * 초기값: DB 조회, 이후: postgres_changes Realtime(mcs_equipment UPDATE)
+ * tick-loop이 location_id를 hop마다 갱신하므로 즉각 반영됨.
+ */
+export function useExecutorLocation(equipmentId: string | null) {
+  const [locationId, setLocationId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!equipmentId) { setLocationId(null); return; }
+
+    const supabase = createClient();
+
+    // 초기 위치 조회
+    supabase
+      .from('mcs_equipment')
+      .select('location_id')
+      .eq('id', equipmentId)
+      .single()
+      .then(({ data }) => {
+        if (data) setLocationId((data as Record<string, unknown>).location_id as string | null);
+      });
+
+    // AGV 위치 변경 즉시 수신
+    // REPLICA IDENTITY FULL 미설정 테이블에서 서버사이드 filter 는 동작하지 않음 → 클라이언트 필터링
+    const ch = supabase
+      .channel(`executor_loc_${equipmentId}_${Date.now()}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'mcs_equipment' },
+        (payload) => {
+          const updated = payload.new as Record<string, unknown>;
+          if ((updated.id as string) !== equipmentId) return;
+          setLocationId((updated.location_id as string | null) ?? null);
+        },
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(ch); };
+  }, [equipmentId]);
+
+  return locationId;
+}
+
 export function useDeleteEquipment() {
   const qc = useQueryClient();
   return useMutation({

@@ -5,6 +5,8 @@ import { AstarRouteTable, type AstarPathStep } from './astar-route-table';
 import { AiRouteView, type AiRouteStep }       from './ai-route-view';
 import { Badge } from '@/components/ui/badge';
 
+interface BlockedNode { unitId: string; unitLabel: string; }
+
 interface RouteComparisonProps {
   astarPath:       AstarPathStep[];
   astarTotalCost:  number;
@@ -12,9 +14,11 @@ interface RouteComparisonProps {
   aiPath?:         AiRouteStep[];
   aiTotalTimeMs?:  number;
   isAiLoading?:    boolean;
+  /** 이번 탐색에 적용된 런타임 장애물 목록 */
+  blockedNodes?:   BlockedNode[];
 }
 
-/** A* / AI / 비교 탭 뷰 */
+/** A* / AI(PPO) / 비교 탭 뷰 + 런타임 장애물 컨텍스트 */
 export function RouteComparison({
   astarPath,
   astarTotalCost,
@@ -22,21 +26,41 @@ export function RouteComparison({
   aiPath,
   aiTotalTimeMs,
   isAiLoading,
+  blockedNodes = [],
 }: RouteComparisonProps) {
-  // 비교 요약: A* 총 비용(m) → 예상 시간 (0.3 m/s 기준)
   const astarEstimateSec = (astarTotalCost / 0.3).toFixed(1);
   const aiEstimateSec    = ((aiTotalTimeMs ?? 0) / 1000).toFixed(1);
 
-  // 경로 동일 여부 판단 (unitLabel 기준)
   const astarLabels = astarPath.map((s) => s.unitLabel).join(',');
   const aiLabels    = (aiPath ?? []).map((s) => s.unitLabel).join(',');
   const isDifferent = aiPath && aiPath.length > 0 && astarLabels !== aiLabels;
 
   return (
+    <div className="space-y-3">
+      {/* 장애물 컨텍스트 배너 */}
+      {blockedNodes.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+          <span className="font-semibold shrink-0">🚧 장애물 우회 경로:</span>
+          {blockedNodes.map((n) => (
+            <Badge key={n.unitId} variant="outline" className="border-red-300 bg-white text-[9px] text-red-600 font-mono">
+              {n.unitLabel}
+            </Badge>
+          ))}
+        </div>
+      )}
+
+      {/* CACTUS / CBS-TS 미구현 안내 */}
+      <div className="rounded-md border border-amber-100 bg-amber-50 px-3 py-2 text-[11px] text-amber-700">
+        <span className="font-semibold">알고리즘 비교 현황:</span>
+        {' '}A* ✅ · PPO ✅ ·{' '}
+        <span className="opacity-60">CACTUS 🔧(Task 025) · CBS-TS 🔧(Task 026)</span>
+        {' '}— 구현 후 자동 반영
+      </div>
+
     <Tabs defaultValue="astar">
       <TabsList className="mb-3">
         <TabsTrigger value="astar">A* 경로</TabsTrigger>
-        <TabsTrigger value="ai">AI 경로</TabsTrigger>
+        <TabsTrigger value="ai">PPO 경로</TabsTrigger>
         <TabsTrigger value="compare">비교</TabsTrigger>
       </TabsList>
 
@@ -119,5 +143,6 @@ export function RouteComparison({
         </div>
       </TabsContent>
     </Tabs>
+    </div>
   );
 }

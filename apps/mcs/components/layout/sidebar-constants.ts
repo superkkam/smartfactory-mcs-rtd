@@ -1,6 +1,7 @@
 import {
   BarChart2,
   Bot,
+  Compass,
   GitFork,
   LayoutDashboard,
   Map,
@@ -52,6 +53,11 @@ export const NAV_ITEMS: NavItem[] = [
     icon: Package,
   },
   {
+    title: 'AGV 위치 관리',
+    href: '/agv-admin',
+    icon: Bot,
+  },
+  {
     title: '시뮬레이션',
     icon: PlayCircle,
     children: [
@@ -69,6 +75,11 @@ export const NAV_ITEMS: NavItem[] = [
         title: '환경 설정',
         href: '/simulation/settings',
         icon: Settings,
+      },
+      {
+        title: 'Algorithm Playground',
+        href: '/simulation/playground',
+        icon: Compass,
       },
     ],
   },

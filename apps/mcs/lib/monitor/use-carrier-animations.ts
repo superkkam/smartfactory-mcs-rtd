@@ -20,10 +20,18 @@ import { getSmoothStepPath, Position, type Node, type Edge } from '@xyflow/react
 import type { Equipment, EquipmentUnit, Carrier } from '@workspace/types/mcs';
 import type { HopEvent } from '@/lib/api/layout-monitor';
 
-/** 이동 속도 및 시간 파라미터 */
-const MIN_DURATION_MS  = 200;   // 마이크로 hop 플리커 방지 하한
-const MAX_DURATION_MS  = 8000;  // 비정상 루프 방지 실용 상한 (사실상 비활성)
-const SPEED_PX_PER_SEC = 120;   // 픽셀/초 — 거리 비례 일정 속도 보장
+/**
+ * 이동 속도 및 시간 파라미터
+ * ACS 백엔드 HOP_INTERVAL_MS=1000 (vehicle-controller.ts:23) 와 동기화.
+ * duration 을 hop 간격 직전(950ms)으로 묶어 거리 무관 일정한 페이스 유지.
+ * 짧은 엣지가 빨리 끝나 멈춤 구간이 생기던 문제,
+ * 긴 엣지에서 큐가 누적돼 빨라 보이던 문제를 동시에 해소.
+ */
+const HOP_DURATION_MS  = 950;   // hop 1개 ≈ 1초(ACS) 직전, 50ms 마진
+const MIN_DURATION_MS  = 700;   // 매우 짧은 엣지도 최소 이 시간 이상 유지
+const MAX_DURATION_MS  = 1200;  // 매우 긴 엣지도 1.2초 이상 끌지 않음 — 큐 누적 방지
+// SPEED_PX_PER_SEC 는 현재 HOP_DURATION_MS 고정 방식에서 사용하지 않음.
+// 거리 비례 동적 속도가 필요할 경우 여기에서 재활성.
 /** 큐 최대 허용 대기 hop 수 (초과 시 오래된 hop ack + 최신 위치로 스냅) */
 const MAX_PENDING = 2;
 
@@ -55,10 +63,11 @@ function unitIdToRfNode(
   }
 
   if (unit.unitType === 'Port') {
+    const label = unit.equipmentUnitId.trim();
     return rfNodes.find((n) =>
       n.type === 'port' && (
-        (n.data as { portId?: string }).portId === unit.equipmentUnitId ||
-        n.id === unit.equipmentUnitId
+        ((n.data as { portId?: string }).portId ?? '').trim() === label ||
+        n.id === label
       )
     ) ?? null;
   }
@@ -99,7 +108,9 @@ function bfsRfPath(fromId: string, toId: string, edges: Edge[]): string[] | null
 }
 
 function rfNodeCenter(node: Node): { x: number; y: number } {
-  return { x: node.position.x + 16, y: node.position.y + 16 };
+  const w = (node.measured?.width  ?? node.width  ?? 32) as number;
+  const h = (node.measured?.height ?? node.height ?? 32) as number;
+  return { x: node.position.x + w / 2, y: node.position.y + h / 2 };
 }
 
 /** 핸들 ID ("t"|"l"|"b"|"r") → React Flow Position */
@@ -145,10 +156,37 @@ function getHandlePoint(
 }
 
 /**
- * 두 노드 사이의 Transfer Relation 엣지를 getSmoothStepPath 로 계산하고
- * totalLength 비율로 numSamples 개 좌표를 샘플링해 반환한다.
- *
+ * SVGPathElement 에서 numSamples 개 등간격 좌표를 샘플링한다.
+ * getPointAtLength 는 path 의 로컬 좌표계(= React Flow 논리 좌표계)를 반환하므로
+ * animatedNodes 의 position 값과 좌표계가 일치한다.
+ */
+function sampleSVGPath(
+  pathEl: SVGPathElement,
+  reverse: boolean,
+  numSamples: number,
+): Array<{ x: number; y: number }> {
+  const total  = pathEl.getTotalLength();
+  const points: Array<{ x: number; y: number }> = [];
+  for (let i = 1; i <= numSamples; i++) {
+    const t   = i / numSamples;
+    const len = reverse ? total * (1 - t) : total * t;
+    const pt  = pathEl.getPointAtLength(len);
+    points.push({ x: pt.x, y: pt.y });
+  }
+  return points;
+}
+
+/**
+ * 두 노드 사이의 Transfer Relation 엣지 경로를 샘플링해 반환한다.
  * reverse=true 이면 target→source 방향으로 샘플링.
+ *
+ * DOM-first 전략:
+ *   transfer-edge.tsx 가 <path id={edge.id} d={edgePath} .../> 를 렌더하므로
+ *   document.getElementById(edge.id) 로 실제 그려진 경로를 직접 읽는다.
+ *   → 핸들 선택 알고리즘·중첩 노드 좌표계 차이에 의한 경로 어긋남을 근본 해소.
+ *
+ * fallback (DOM 에 아직 없는 경우: 첫 프레임 paint 전 등):
+ *   기존 getSmoothStepPath 재계산 방식 유지.
  */
 function sampleEdgePath(
   edge: Edge,
@@ -157,6 +195,14 @@ function sampleEdgePath(
   reverse: boolean,
   numSamples: number = 18,
 ): Array<{ x: number; y: number }> {
+  // DOM-first: 실제 렌더링된 path 엘리먼트에서 직접 샘플링
+  // getTotalLength() === 0 은 hidden(display:none) 또는 아직 미렌더 상태 → fallback
+  const domPath = document.getElementById(edge.id) as SVGPathElement | null;
+  if (domPath && typeof domPath.getTotalLength === 'function' && domPath.getTotalLength() > 0) {
+    return sampleSVGPath(domPath, reverse, numSamples);
+  }
+
+  // fallback: DOM 에 아직 없을 때 getSmoothStepPath 로 재계산
   const src = getHandlePoint(sourceNode, edge.sourceHandle, targetNode);
   const tgt = getHandlePoint(targetNode, edge.targetHandle, sourceNode);
 
@@ -170,25 +216,14 @@ function sampleEdgePath(
     borderRadius:   8,
   });
 
-  // 임시 SVG 엘리먼트로 경로 길이 측정 및 등간격 샘플링
-  const svgNs = 'http://www.w3.org/2000/svg';
-  const svg   = document.createElementNS(svgNs, 'svg');
-  const pathEl = document.createElementNS(svgNs, 'path');
+  const svgNs  = 'http://www.w3.org/2000/svg';
+  const svg    = document.createElementNS(svgNs, 'svg');
+  const pathEl = document.createElementNS(svgNs, 'path') as SVGPathElement;
   pathEl.setAttribute('d', pathD);
   svg.appendChild(pathEl);
-  // DOM 에 임시 삽입해야 getTotalLength() 동작
   svg.style.cssText = 'position:absolute;visibility:hidden;width:0;height:0;overflow:hidden';
   document.body.appendChild(svg);
-
-  const total  = pathEl.getTotalLength();
-  const points: Array<{ x: number; y: number }> = [];
-  for (let i = 1; i <= numSamples; i++) {
-    const t   = i / numSamples;
-    const len = reverse ? total * (1 - t) : total * t;
-    const pt  = pathEl.getPointAtLength(len);
-    points.push({ x: pt.x, y: pt.y });
-  }
-
+  const points = sampleSVGPath(pathEl, reverse, numSamples);
   document.body.removeChild(svg);
   return points;
 }
@@ -216,10 +251,11 @@ function unitToRFPosition(
   }
 
   if (unit.unitType === 'Port') {
+    const label = unit.equipmentUnitId.trim();
     const rfNode = rfNodes.find((n) =>
       n.type === 'port' && (
-        (n.data as { portId?: string }).portId === unit.equipmentUnitId ||
-        n.id === unit.equipmentUnitId
+        ((n.data as { portId?: string }).portId ?? '').trim() === label ||
+        n.id === label
       )
     );
     if (rfNode) return rfNodeCenter(rfNode);
@@ -481,12 +517,13 @@ export function useCarrierAnimations({
       const toNode   = ev.toUnitId ? unitIdToRfNode(ev.toUnitId, _units, _equipmentNodes) : null;
 
       const waypoints: Array<{ x: number; y: number }> = [];
+      let rfPath: string[] | null = null;   // duration 계산에서 엣지 수 참조용
 
       if (fromNode && toNode && fromNode.id !== toNode.id) {
-        const rfPath = bfsRfPath(fromNode.id, toNode.id, _layoutEdges);
+        rfPath = bfsRfPath(fromNode.id, toNode.id, _layoutEdges);
 
         // BFS 성공 → rfPath의 모든 인접 쌍을 엣지 경로로 연결 (멀티홉도 엣지 따라 이동)
-        if (rfPath && rfPath.length >= 2) {
+        if (rfPath && rfPath.length >= 2) {  // eslint-disable-line @typescript-eslint/no-unnecessary-condition
           for (let i = 0; i < rfPath.length - 1; i++) {
             const curId  = rfPath[i];
             const nextId = rfPath[i + 1];
@@ -526,7 +563,9 @@ export function useCarrierAnimations({
         continue;
       }
 
-      // ── 거리 기반 duration 산출 ────────────────────────────────────────
+      // ── duration 산출 ────────────────────────────────────────────────
+      // ACS 가 1초에 한 칸씩 DB 를 갱신하므로, hop 1개 = 950ms 로 고정.
+      // 멀티 엣지(BFS rfPath 길이 > 2) 인 경우에만 엣지 수에 비례해 늘림.
       const distances: number[] = [];
       let prevPt = fromPos;
       for (const wp of waypoints) {
@@ -535,12 +574,13 @@ export function useCarrierAnimations({
       }
       const totalDist = distances.reduce((a, b) => a + b, 0);
 
-      // 전체 경로 길이 기반 duration 계산 — MIN/MAX 는 "한 홉 전체" 단위로 clamp.
-      // (이전 코드: perSegMs에 clamp를 적용하고 waypoints.length를 곱해
-      //  홉당 7~14초가 되는 버그가 있었음. MAX_PENDING snap 텔레포트의 근본 원인.)
-      const totalMs  = (totalDist / SPEED_PX_PER_SEC) * 1000;
-      const clamped  = Math.min(MAX_DURATION_MS, Math.max(MIN_DURATION_MS, totalMs));
-      const duration = clamped / 1000;
+      // rfPath 가 있으면 엣지 수(홉 수)를 기준으로 duration 배분.
+      // 단일 hop event = 인접 1칸 = rfPath.length-1 ≈ 1 이 대부분.
+      const edgeCount = rfPath && rfPath.length >= 2 ? rfPath.length - 1 : 1;
+      const totalMs   = edgeCount * HOP_DURATION_MS;
+      const clamped   = Math.min(MAX_DURATION_MS * edgeCount,
+                                 Math.max(MIN_DURATION_MS, totalMs));
+      const duration  = clamped / 1000;
 
       let cum = 0;
       const times = distances.map((d) => {
@@ -625,13 +665,18 @@ export function useCarrierAnimations({
     });
   }
 
+  // 현재 레이아웃 unit ID 집합 (다른 레이아웃 캐리어 노이즈 차단)
+  const layoutUnitIds = new Set(units.map((u) => u.id));
+
   for (const carrier of carriers) {
     if (!carrier.locationId) continue;
+    if (!layoutUnitIds.has(carrier.locationId)) continue;
 
     // ── 1. parent AMR 결정 ───────────────────────────────────────────────────
     // 우선순위 1: state='Transferring' + currentEquipmentId 직접 매칭
     //   → unit cache stale 여부와 무관하게 AMR 을 즉시 특정할 수 있음
     let parentAgv: Equipment | undefined;
+    let parentAgvFromSticky = false;   // sticky cache 로 결정된 경우: amber 색상 강제 유지
     if (carrier.state === 'Transferring' && carrier.currentEquipmentId) {
       parentAgv = equipments.find(
         (e) => e.id === carrier.currentEquipmentId && e.equipmentType === 'AGV',
@@ -688,6 +733,7 @@ export function useCarrierAnimations({
             if (!visuallyArrived) {
               // 아직 이동 중 → sticky AMR 위에 렌더 (텔레포트 방지 ★)
               parentAgv = stickyAmr;
+              parentAgvFromSticky = true;
             } else {
               // 시각적 도착 완료 → sticky 해제, destination port 로 자연 전환
               carrierStickyAmrRef.current.delete(carrier.id);
@@ -710,6 +756,7 @@ export function useCarrierAnimations({
         positionsRef.current.get(parentAgv.id) ??
         (() => {
           const n = animatedNodes.find((nd) => nd.id === `amr-${parentAgv!.id}`);
+          // DashboardAgvNode: 44×26px → center = +22, +13
           return n ? { x: n.position.x + 22, y: n.position.y + 13 } : null;
         })() ??
         unitToRFPosition(parentAgv.locationId ?? '', units, equipmentNodes, equipments);
@@ -730,6 +777,10 @@ export function useCarrierAnimations({
 
       if (!carrierPos) continue;
 
+      // sticky 활성 중 DB 가 state='Installed' 로 패치해도 amber 유지
+      // → AMR 이 시각적으로 도착할 때까지 캐리어 색이 먼저 바뀌는 어색함 방지
+      const displayState = parentAgvFromSticky ? 'Transferring' : carrier.state;
+
       animatedNodes.push({
         id:        `carrier-${carrier.id}`,
         type:      'carrier',
@@ -737,7 +788,7 @@ export function useCarrierAnimations({
         width:     20,
         height:    20,
         measured:  { width: 20, height: 20 },
-        data:      { carrierId: carrier.carrierId, state: carrier.state },
+        data:      { carrierId: carrier.carrierId, state: displayState, showLabel: false },
         draggable:  false,
         selectable: false,
         zIndex:     10,
@@ -755,11 +806,12 @@ export function useCarrierAnimations({
     animatedNodes.push({
       id:       `carrier-${carrier.id}`,
       type:     'carrier',
-      position: basePos,
-      width:    20,
-      height:   20,
-      measured: { width: 20, height: 20 },
-      data:     { carrierId: carrier.carrierId, state: carrier.state },
+      // SVG 20×20 정중앙 정렬(-10, -10) + 4px 위로 띄워 포트 위에 올라타는 효과
+      position: { x: basePos.x - 10, y: basePos.y - 14 },
+      width:    60,
+      height:   36,
+      measured: { width: 60, height: 36 },
+      data:     { carrierId: carrier.carrierId, state: carrier.state, showLabel: true },
       draggable:  false,
       selectable: false,
       zIndex:     10,

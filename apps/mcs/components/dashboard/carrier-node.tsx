@@ -5,8 +5,9 @@ import { type Node, type NodeProps } from '@xyflow/react';
 import type { CarrierState } from '@workspace/types/constants';
 
 export type CarrierNodeData = {
-  carrierId: string;
-  state: CarrierState;
+  carrierId:  string;
+  state:      CarrierState;
+  showLabel?: boolean;
 };
 
 export type CarrierNodeType = Node<CarrierNodeData>;
@@ -24,27 +25,50 @@ export const CarrierNode = memo(function CarrierNode({ data }: NodeProps<Carrier
   const dotColor    = moving ? '#fff'    : '#e0e7ff';
 
   return (
-    /* AGV 섀시 위에 얹히도록 배경 없이 SVG 만 표시 */
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 40 40"
-      style={{ filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.45))' }}
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      {/* FOUP 본체 */}
-      <rect x={5} y={10} width={30} height={24} rx={3} fill={bodyColor} />
-      {/* 상단 핸들 */}
-      <rect x={13} y={5}  width={14} height={7}  rx={3} fill={handleColor} />
-      {/* 전면 패널 */}
-      <rect x={8}  y={13} width={24} height={18} rx={2} fill={panelColor} opacity={0.8} />
-      {/* 슬롯 라인 */}
-      <line x1={9} y1={18} x2={31} y2={18} stroke="rgba(0,0,0,0.25)" strokeWidth={1} />
-      <line x1={9} y1={23} x2={31} y2={23} stroke="rgba(0,0,0,0.25)" strokeWidth={1} />
-      <line x1={9} y1={28} x2={31} y2={28} stroke="rgba(0,0,0,0.25)" strokeWidth={1} />
-      {/* 중앙 인디케이터 */}
-      <circle cx={20} cy={20} r={3.5} fill={dotColor} />
-    </svg>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+      {/* FOUP 아이콘 SVG */}
+      <svg
+        width="20"
+        height="20"
+        viewBox="0 0 40 40"
+        style={{ filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.45))' }}
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        {/* FOUP 본체 */}
+        <rect x={5} y={10} width={30} height={24} rx={3} fill={bodyColor} />
+        {/* 상단 핸들 */}
+        <rect x={13} y={5}  width={14} height={7}  rx={3} fill={handleColor} />
+        {/* 전면 패널 */}
+        <rect x={8}  y={13} width={24} height={18} rx={2} fill={panelColor} opacity={0.8} />
+        {/* 슬롯 라인 */}
+        <line x1={9} y1={18} x2={31} y2={18} stroke="rgba(0,0,0,0.25)" strokeWidth={1} />
+        <line x1={9} y1={23} x2={31} y2={23} stroke="rgba(0,0,0,0.25)" strokeWidth={1} />
+        <line x1={9} y1={28} x2={31} y2={28} stroke="rgba(0,0,0,0.25)" strokeWidth={1} />
+        {/* 중앙 인디케이터 */}
+        <circle cx={20} cy={20} r={3.5} fill={dotColor} />
+      </svg>
+      {/* 정적 배치 시 캐리어 ID 라벨 */}
+      {data.showLabel && (
+        <span
+          style={{
+            fontSize:       9,
+            lineHeight:     1,
+            color:          '#374151',
+            background:     'rgba(255,255,255,0.85)',
+            borderRadius:   2,
+            padding:        '1px 3px',
+            whiteSpace:     'nowrap',
+            boxShadow:      '0 1px 2px rgba(0,0,0,0.2)',
+            pointerEvents:  'none',
+          }}
+        >
+          {data.carrierId}
+          {data.state === 'Transferring' && (
+            <span style={{ marginLeft: 3, opacity: 0.65, color: '#d97706' }}>·이동</span>
+          )}
+        </span>
+      )}
+    </div>
   );
 });
 

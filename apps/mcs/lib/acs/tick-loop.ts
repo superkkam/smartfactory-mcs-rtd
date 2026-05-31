@@ -17,7 +17,7 @@
  * - Supabase 업데이트: mcs_equipment.location_id, mcs_carrier.location_id, mcs_micro_command.state
  */
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import {
   isMobileEquipment,
@@ -26,6 +26,9 @@ import {
   nextUnitId,
   currentUnitId,
 } from './vehicle-controller';
+import { loadGraphClient } from '@/lib/engine/graph-loader-client';
+import { runAstar } from '@/lib/engine/astar';
+import type { GraphNode } from '@/lib/engine/types';
 import type { AcsVehicle, AcsState, AcsLeaderLock } from './types';
 import { ACS_LEADER_KEY } from './types';
 
@@ -35,6 +38,23 @@ import type { Edge, Node } from '@xyflow/react';
 const TICK_INTERVAL_MS = 100;
 const HEARTBEAT_MS = 500;
 const LEADER_TIMEOUT_MS = 1500;
+
+/** directed 그래프를 복사해 역방향 엣지를 추가한 양방향 그래프 반환 */
+function makeBidirectional(graph: Map<string, GraphNode>): Map<string, GraphNode> {
+  const bi = new Map<string, GraphNode>();
+  graph.forEach((node, id) => {
+    bi.set(id, { ...node, neighbors: [...node.neighbors] });
+  });
+  graph.forEach((node) => {
+    for (const nb of node.neighbors) {
+      const target = bi.get(nb.toUnitId);
+      if (target && !target.neighbors.some((n) => n.toUnitId === node.id)) {
+        target.neighbors.push({ toUnitId: node.id, weight: nb.weight });
+      }
+    }
+  });
+  return bi;
+}
 
 // ─── Leader lock helpers ──────────────────────────────────────────
 
@@ -112,6 +132,8 @@ export interface UseAcsTickLoopParams {
   units: EquipmentUnit[];
   /** 모든 캐리어 */
   carriers: Carrier[];
+  /** 현재 선택된 레이아웃 DB uuid (홈 복귀 경로 계산에 사용) */
+  layoutId?: string;
 }
 
 export interface UseAcsTickLoopResult {
@@ -121,6 +143,8 @@ export interface UseAcsTickLoopResult {
   start: () => void;
   /** 수동 정지 (토글) */
   stop: () => void;
+  /** 특정 AGV 를 다음 tick 에 충전소로 복귀시킴 (Idle 일 때만 실제 트리거됨) */
+  requestReturnHome: (equipmentId: string) => void;
 }
 
 /**
@@ -131,6 +155,7 @@ export function useAcsTickLoop({
   layoutNodes,
   layoutEdges,
   equipments,
+  layoutId,
   units,
   carriers,
 }: UseAcsTickLoopParams): UseAcsTickLoopResult {
@@ -156,17 +181,43 @@ export function useAcsTickLoop({
   const carriersRef    = useRef(carriers);
   const layoutEdgesRef = useRef(layoutEdges);
   const layoutNodesRef = useRef(layoutNodes);
+  const layoutIdRef    = useRef(layoutId);
 
   useEffect(() => { equipmentsRef.current  = equipments;   }, [equipments]);
   useEffect(() => { unitsRef.current       = units;        }, [units]);
   useEffect(() => { carriersRef.current    = carriers;     }, [carriers]);
   useEffect(() => { layoutEdgesRef.current = layoutEdges;  }, [layoutEdges]);
   useEffect(() => { layoutNodesRef.current = layoutNodes;  }, [layoutNodes]);
+  useEffect(() => { layoutIdRef.current    = layoutId;     }, [layoutId]);
 
-  // 초기 vehicles 맵 동기화 (mobile equipment 만)
+  // 수동 충전소 복귀 요청 큐 (UI → tick 으로 전달)
+  const returnQueueRef = useRef<Set<string>>(new Set());
+
+  const requestReturnHome = useCallback((equipmentId: string) => {
+    returnQueueRef.current.add(equipmentId);
+    console.log(`[ACS] 충전소 복귀 요청 | agv=${equipmentId.slice(0, 8)}`);
+  }, []);
+
+  // mobile equipment ID 집합이 바뀔 때만 vehicles 맵 재초기화
+  // (B6) equipments 배열은 매 location_id update 마다 새 reference 가 되므로
+  // 직접 dep 으로 쓰면 매 hop 마다 useEffect 가 fire → tick in-flight 중 vehiclesRef 가
+  // 교체되어 결과가 detach 되는 race condition 발생. ID 집합 문자열로 안정화.
+  const mobileEquipmentKey = useMemo(
+    () =>
+      equipments
+        .filter((e) => isMobileEquipment(e.equipmentType))
+        .map((e) => e.id)
+        .sort()
+        .join(','),
+    [equipments],
+  );
+
   useEffect(() => {
+    console.log(
+      `[ACS] vehiclesRef 재초기화 | mobileIds=${mobileEquipmentKey || '(empty)'}`,
+    );
     const newMap = new Map<string, AcsVehicle>();
-    for (const eq of equipments) {
+    for (const eq of equipmentsRef.current) {
       if (!isMobileEquipment(eq.equipmentType)) continue;
       const existing = vehiclesRef.current.get(eq.id);
       newMap.set(eq.id, existing ?? {
@@ -187,7 +238,8 @@ export function useAcsTickLoop({
     }
     vehiclesRef.current = newMap;
     setAcsState((prev) => ({ ...prev, vehicles: new Map(newMap) }));
-  }, [equipments]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mobileEquipmentKey]);
 
   // ─── 메인 tick ────────────────────────────────────────────────
   const tick = useCallback(async () => {
@@ -204,6 +256,62 @@ export function useAcsTickLoop({
     const supabase = createClient();
     const vehicles = vehiclesRef.current;
     const units    = unitsRef.current;
+
+    // 홈(충전소) 복귀 시작 헬퍼:
+    // 자동(Depositing→Idle 직후) 및 수동(requestReturnHome 큐) 양쪽에서 재사용.
+    // nextVehicle 을 mutate 하며 성공 시 MovingEmpty + returningHome=true 로 진입.
+    async function startHomeReturn(
+      nextVehicle: AcsVehicle,
+      curUnit: string | null,
+    ): Promise<boolean> {
+      const currentLId = layoutIdRef.current;
+      const agvNode = layoutNodesRef.current.find(
+        (n) => (n.data as Record<string, unknown>).equipmentId === nextVehicle.equipmentLabel,
+      );
+      const homeNodeCode = agvNode
+        ? (agvNode.data as Record<string, unknown>).homeNodeId as string | undefined
+        : undefined;
+      const homeUnit = homeNodeCode
+        ? unitsRef.current.find((u) => u.equipmentUnitId === homeNodeCode)
+        : undefined;
+
+      if (!currentLId || !homeUnit || !curUnit || curUnit === homeUnit.id) {
+        nextVehicle.currentPath  = [];
+        nextVehicle.pathIndex    = 0;
+        nextVehicle.pickupUnitId = null;
+        return false;
+      }
+
+      try {
+        const graph = await loadGraphClient(currentLId, supabase);
+        const { path: homePath } = runAstar(graph, curUnit, homeUnit.id, new Set());
+        if (homePath.length >= 2) {
+          nextVehicle.vehicleState  = 'MovingEmpty';
+          nextVehicle.currentPath   = homePath.map((p) => p.unitId);
+          nextVehicle.pathIndex     = 0;
+          nextVehicle.pickupUnitId  = homeUnit.id;
+          nextVehicle.returningHome = true;
+          nextVehicle.lastHopAt     = Date.now();
+          nextVehicle.updatedAt     = Date.now();
+          console.log(
+            `[ACS] 홈복귀 시작 | agv=${nextVehicle.equipmentLabel} home=${homeNodeCode} (${homePath.length}홉)`,
+          );
+          return true;
+        }
+        nextVehicle.currentPath  = [];
+        nextVehicle.pathIndex    = 0;
+        nextVehicle.pickupUnitId = null;
+        return false;
+      } catch (e) {
+        nextVehicle.currentPath  = [];
+        nextVehicle.pathIndex    = 0;
+        nextVehicle.pickupUnitId = null;
+        console.error(
+          `[ACS] 홈복귀 A* 실패 | agv=${nextVehicle.equipmentLabel} | ${e instanceof Error ? e.message : e}`,
+        );
+        return false;
+      }
+    }
 
     try {
       // ── 1. Idle AMR 에게 Pending macro_command 할당 ────────────────
@@ -250,6 +358,9 @@ export function useAcsTickLoop({
 
           // abandoned InProgress macro 회수: Completed 가 아닌 micro 만 남김, InProgress → Pending 리셋
           if ((macro.state as string) === 'InProgress') {
+            console.log(
+              `[ACS] InProgress macro 회수 | macro=${(macro.id as string).slice(0, 8)} totalMicros=${micros.length}`,
+            );
             const remaining = microRows.filter((m) => m.state !== 'Completed');
             if (remaining.length === 0) {
               // 모든 micro 가 완료됐는데 macro 만 InProgress 인 경우 → macro Completed 처리
@@ -280,27 +391,78 @@ export function useAcsTickLoop({
             .single();
           const agvCurrentUnitId = (eqRow as Record<string, unknown> | null)?.location_id as string | null;
 
-          // AGV 가 출발지가 아닌 곳에 있으면 즉시 텔레포트 (역주행 방지)
-          // 빈차 이동은 시각적으로 생략하고 출발지→목적지 순방향만 애니메이션
+          // AGV 가 출발지(OUT 포트)가 아닌 곳(충전소 등)에 있으면 빈차 이동 경로를 A*로 계산
+          // 양방향 그래프 사용: directed 그래프에서 OUT 포트는 port→node 방향만 있을 수 있음
+          //
+          // 실패 시 폴백: 텔레포트 (시스템 고착 방지)
+          //   - 레이아웃에 충전소↔grid transfer_relation 누락 시 fallback
+          //   - 빈차 시각화는 안되지만 macro 진행은 계속됨
+          let fullPath: string[];
+          let useTeleportFallback = false;
+
           if (agvCurrentUnitId && agvCurrentUnitId !== sourceToDestPath[0]) {
+            const currentLId = layoutIdRef.current;
+            if (!currentLId) {
+              useTeleportFallback = true;
+              fullPath = sourceToDestPath;
+              console.warn('[ACS] layoutIdRef 미로드 → 텔레포트 폴백');
+            } else {
+              try {
+                const graph = await loadGraphClient(currentLId, supabase);
+                const biGraph = makeBidirectional(graph);
+                const { path: emptyPath } = runAstar(biGraph, agvCurrentUnitId, sourceToDestPath[0], new Set());
+                if (emptyPath.length >= 2) {
+                  // emptyPath 끝 노드 = sourceToDestPath[0] → 중복 제거 후 합산
+                  fullPath = [...emptyPath.map((p) => p.unitId), ...sourceToDestPath.slice(1)];
+                  console.log(
+                    `[ACS] 빈차 A* 성공 | agv=${vehicle.equipmentLabel} path=[${fullPath.slice(0, 6).join(',')}${fullPath.length > 6 ? ',...' : ''}] (총 ${fullPath.length}홉)`,
+                  );
+                } else {
+                  useTeleportFallback = true;
+                  fullPath = sourceToDestPath;
+                  console.warn(
+                    `[ACS] 빈차 이동 경로 없음 → 텔레포트 폴백 | agv=${vehicle.equipmentLabel} cur=${agvCurrentUnitId} src=${sourceToDestPath[0]} graphSize=${graph.size}`,
+                  );
+                }
+              } catch (e) {
+                useTeleportFallback = true;
+                fullPath = sourceToDestPath;
+                console.error(
+                  `[ACS] 빈차 이동 A* 실패 → 텔레포트 폴백 | agv=${vehicle.equipmentLabel} cur=${agvCurrentUnitId} src=${sourceToDestPath[0]} | ${e instanceof Error ? e.message : e}`,
+                );
+              }
+            }
+          } else {
+            // AGV 이미 출발지에 있음 (또는 위치 미파악)
+            fullPath = sourceToDestPath;
+          }
+
+          // 폴백 시: DB location_id 를 sourceToDestPath[0] 으로 텔레포트 (역주행 방지)
+          if (useTeleportFallback && agvCurrentUnitId) {
             await supabase
               .from('mcs_equipment')
               .update({ location_id: sourceToDestPath[0] })
               .eq('id', vehicle.equipmentId);
           }
-          const fullPath = sourceToDestPath; // forward-only (엣지 방향대로)
 
           if (fullPath.length < 2) continue;
 
-          // DB: macro → InProgress, 첫 micro → InProgress
+          // DB: macro → InProgress, 첫 micro → InProgress + executor 설정
           await supabase
             .from('mcs_macro_command')
             .update({ state: 'InProgress' })
             .eq('id', macro.id as string);
           await supabase
             .from('mcs_micro_command')
-            .update({ state: 'InProgress' })
+            .update({ state: 'InProgress', executor_equipment_id: vehicle.equipmentId })
             .eq('id', microRows[0].id);
+          // 나머지 micro 에 executor_equipment_id 설정 (경로 추적 및 패널 표시용)
+          if (microRows.length > 1) {
+            await supabase
+              .from('mcs_micro_command')
+              .update({ executor_equipment_id: vehicle.equipmentId })
+              .in('id', microRows.slice(1).map((m) => m.id));
+          }
 
           const microCommandIds = microRows.map((m) => ({
             id: m.id,
@@ -322,12 +484,34 @@ export function useAcsTickLoop({
             lastHopAt:             Date.now(),
             updatedAt:             Date.now(),
           });
+          console.log(
+            `[ACS] macro 할당 | macro=${(macro.id as string).slice(0, 8)} ` +
+            `carrier=${((macro.carrier_id as string) ?? 'null').slice(0, 8)} ` +
+            `src=${sourceUnitId?.slice(0, 8) ?? 'null'} dst=${destUnitId?.slice(0, 8) ?? 'null'} ` +
+            `agvCur=${agvCurrentUnitId?.slice(0, 8) ?? 'null'} microRows=${microRows.length} fullPath=${fullPath.length}홉`,
+          );
         }
       }
 
       // ── 2. 각 AMR 상태 전이 + 경로 이동 ─────────────────────────────
       for (const [equipmentId, vehicle] of vehicles) {
-        if (vehicle.vehicleState === 'Idle') continue;
+        if (vehicle.vehicleState === 'Idle') {
+          // 수동 충전소 복귀 요청 처리
+          if (returnQueueRef.current.has(equipmentId)) {
+            returnQueueRef.current.delete(equipmentId);
+            // Idle vehicle 은 currentPath 가 비어 있어 currentUnitId 가 null → DB 에서 직접 조회
+            const { data: eqRow } = await supabase
+              .from('mcs_equipment')
+              .select('location_id')
+              .eq('id', equipmentId)
+              .single();
+            const curUnitForHome = (eqRow as Record<string, unknown> | null)?.location_id as string | null;
+            const nextVehicle = { ...vehicle };
+            await startHomeReturn(nextVehicle, curUnitForHome);
+            vehicles.set(equipmentId, nextVehicle);
+          }
+          continue;
+        }
 
         const curUnit = currentUnitId(vehicle);
 
@@ -359,26 +543,33 @@ export function useAcsTickLoop({
               .update({ location_id: next })
               .eq('id', equipmentId);
 
-            // progressive micro 업데이트: 현재 micro 의 arrival 에 도달하면 다음 micro 로 전환
-            const curMicroIdx = vehicle.microCommandIds.findIndex(
-              (m) => m.id === vehicle.currentCommandId
-            );
-            if (curMicroIdx >= 0) {
-              const curMicro = vehicle.microCommandIds[curMicroIdx];
-              if (curMicro.arrivalUnitId === next) {
-                // 현재 micro 완료
-                await supabase
-                  .from('mcs_micro_command')
-                  .update({ state: 'Completed' })
-                  .eq('id', curMicro.id);
-                // 다음 micro 가 있으면 InProgress 로
-                const nextMicro = vehicle.microCommandIds[curMicroIdx + 1];
-                if (nextMicro) {
+            // progressive micro 업데이트: 적재 이동 중에만 추적 (빈차 구간은 micro 와 무관)
+            // MovingEmpty 중 경로에 micro.arrivalUnitId 와 동일한 노드가 우연히 겹쳐
+            // micro 가 조기 완료되는 버그 방지
+            if (vehicle.vehicleState === 'MovingLoaded') {
+              const curMicroIdx = vehicle.microCommandIds.findIndex(
+                (m) => m.id === vehicle.currentCommandId
+              );
+              if (curMicroIdx >= 0) {
+                const curMicro = vehicle.microCommandIds[curMicroIdx];
+                if (curMicro.arrivalUnitId === next) {
+                  console.log(
+                    `[ACS] micro 진전 | agv=${vehicle.equipmentLabel} micro=${curMicro.departureUnitId?.slice(0, 8)}→${curMicro.arrivalUnitId?.slice(0, 8)} next=${next.slice(0, 8)}`,
+                  );
+                  // 현재 micro 완료
                   await supabase
                     .from('mcs_micro_command')
-                    .update({ state: 'InProgress' })
-                    .eq('id', nextMicro.id);
-                  nextVehicle.currentCommandId = nextMicro.id;
+                    .update({ state: 'Completed' })
+                    .eq('id', curMicro.id);
+                  // 다음 micro 가 있으면 InProgress 로
+                  const nextMicro = vehicle.microCommandIds[curMicroIdx + 1];
+                  if (nextMicro) {
+                    await supabase
+                      .from('mcs_micro_command')
+                      .update({ state: 'InProgress' })
+                      .eq('id', nextMicro.id);
+                    nextVehicle.currentCommandId = nextMicro.id;
+                  }
                 }
               }
             }
@@ -388,11 +579,62 @@ export function useAcsTickLoop({
         const newState = nextVehicleState(nextVehicle, hasReachedDeparture, hasReachedDestination);
 
         if (newState !== vehicle.vehicleState) {
+          console.log(
+            `[ACS] state 전이 | agv=${vehicle.equipmentLabel} ${vehicle.vehicleState} → ${newState} pathIndex=${vehicle.pathIndex}/${vehicle.currentPath.length}`,
+          );
           nextVehicle.vehicleState = newState;
           nextVehicle.lastHopAt   = Date.now(); // 상태 변경 시 타이머 리셋 (Acquiring/Depositing 대기 시작)
           nextVehicle.updatedAt   = Date.now();
 
           if (newState === 'Acquiring') {
+            // carrier 실제 DB 위치도 함께 로그 (pickup 과 다르면 위치 불일치 진단용)
+            let actualCarrierLoc: string | null = null;
+            if (vehicle.carrierId) {
+              const { data: cRow } = await supabase
+                .from('mcs_carrier')
+                .select('location_id')
+                .eq('id', vehicle.carrierId)
+                .maybeSingle();
+              actualCarrierLoc = (cRow?.location_id as string | null) ?? null;
+            }
+            console.log(
+              `[ACS] Acquiring 진입 | agv=${vehicle.equipmentLabel} pickup=${vehicle.pickupUnitId?.slice(0, 8)} ` +
+              `carrierId=${vehicle.carrierId?.slice(0, 8) ?? 'null'} carrierActualLoc=${actualCarrierLoc?.slice(0, 8) ?? 'null'}`,
+            );
+
+            // (B5) 이미 픽업 완료 가드: carrier 가 이미 amrBodyPort 에 있으면
+            // 이전 tick 결과가 vehiclesRef race 로 소실된 것 → 픽업은 이미 완료됨
+            // → Loaded 로 fast-forward (CANCEL 회피)
+            const amrBodyPortForB5 = units.find(
+              (u) => u.equipmentId === equipmentId && u.unitType === 'AGV'
+            );
+            if (
+              !vehicle.returningHome &&
+              vehicle.carrierId &&
+              amrBodyPortForB5 &&
+              actualCarrierLoc === amrBodyPortForB5.id
+            ) {
+              console.log(
+                `[ACS] Acquiring SKIP (이미 픽업됨) | agv=${vehicle.equipmentLabel} carrier=${vehicle.carrierId.slice(0, 8)}`,
+              );
+              nextVehicle.vehicleState = 'Loaded';
+              nextVehicle.lastHopAt   = Date.now();
+              nextVehicle.updatedAt   = Date.now();
+              vehicles.set(equipmentId, nextVehicle);
+              continue;
+            }
+
+            // 홈 복귀 중 도착 → 캐리어 없이 Idle 복귀
+            if (vehicle.returningHome) {
+              nextVehicle.vehicleState  = 'Idle';
+              nextVehicle.pickupUnitId  = null;
+              nextVehicle.currentPath   = [];
+              nextVehicle.pathIndex     = 0;
+              nextVehicle.returningHome = false;
+              vehicles.set(equipmentId, nextVehicle);
+              continue;
+            }
+
             // 픽업 포트 위 캐리어를 AMR body port 로 이동
             const amrBodyPort = units.find(
               (u) => u.equipmentId === equipmentId && u.unitType === 'AGV'
@@ -400,6 +642,10 @@ export function useAcsTickLoop({
 
             // amrBodyPort 없으면 units 아직 미로드 → 명령 취소 후 Idle 복귀 (고착 방지)
             if (!amrBodyPort || !vehicle.pickupUnitId) {
+              console.warn(
+                `[ACS] Acquiring CANCEL: amrBodyPort 없음 | agv=${vehicle.equipmentLabel} ` +
+                `amrBodyPort=${amrBodyPort ? 'found' : 'null'} pickupUnitId=${vehicle.pickupUnitId?.slice(0, 8) ?? 'null'}`,
+              );
               if (vehicle.currentMacroCommandId) {
                 await supabase
                   .from('mcs_macro_command')
@@ -411,6 +657,28 @@ export function useAcsTickLoop({
                   .from('mcs_micro_command')
                   .update({ state: 'Cancelled' })
                   .eq('id', m.id);
+              }
+              // carrier 가 AGV body 에 있으면 출발지로 복원
+              if (vehicle.carrierId && vehicle.pickupUnitId) {
+                const amrBodyId = units.find(
+                  (u) => u.equipmentId === equipmentId && u.unitType === 'AGV',
+                )?.id;
+                if (amrBodyId) {
+                  const { data: cCheck } = await supabase
+                    .from('mcs_carrier')
+                    .select('location_id')
+                    .eq('id', vehicle.carrierId)
+                    .maybeSingle();
+                  if ((cCheck?.location_id as string | null) === amrBodyId) {
+                    await supabase
+                      .from('mcs_carrier')
+                      .update({ location_id: vehicle.pickupUnitId, current_equipment_id: null, state: 'Installed' })
+                      .eq('id', vehicle.carrierId);
+                    console.log(
+                      `[ACS] CANCEL carrier 복원 | carrier=${vehicle.carrierId.slice(0, 8)} → ${vehicle.pickupUnitId.slice(0, 8)}`,
+                    );
+                  }
+                }
               }
               nextVehicle.vehicleState          = 'Idle';
               nextVehicle.currentCommandId      = null;
@@ -462,6 +730,26 @@ export function useAcsTickLoop({
 
               // carrierId 없으면 출발지에 캐리어 없음 → 반송 취소
               if (!carrierId) {
+                console.warn(
+                  `[ACS] Acquiring CANCEL: 캐리어 없음 | agv=${vehicle.equipmentLabel} pickup=${vehicle.pickupUnitId?.slice(0, 8)}`,
+                );
+                // carrier 가 AGV body 에 stuck 되어 있으면 출발지(pickupUnitId)로 복원
+                if (vehicle.carrierId && vehicle.pickupUnitId && amrBodyPort) {
+                  const { data: cCheck } = await supabase
+                    .from('mcs_carrier')
+                    .select('location_id')
+                    .eq('id', vehicle.carrierId)
+                    .maybeSingle();
+                  if ((cCheck?.location_id as string | null) === amrBodyPort.id) {
+                    await supabase
+                      .from('mcs_carrier')
+                      .update({ location_id: vehicle.pickupUnitId, current_equipment_id: null, state: 'Installed' })
+                      .eq('id', vehicle.carrierId);
+                    console.log(
+                      `[ACS] CANCEL carrier 복원 | carrier=${vehicle.carrierId.slice(0, 8)} → ${vehicle.pickupUnitId.slice(0, 8)}`,
+                    );
+                  }
+                }
                 if (vehicle.currentMacroCommandId) {
                   await supabase
                     .from('mcs_macro_command')
@@ -488,6 +776,9 @@ export function useAcsTickLoop({
           } else if (newState === 'Idle') {
             // Depositing → Idle: carrier 를 목적지 port 에 내려놓기
             // ※ carriersRef 는 stale 할 수 있으므로 vehicle.carrierId 로 직접 업데이트
+            console.log(
+              `[ACS] Depositing→Idle | agv=${vehicle.equipmentLabel} carrier=${vehicle.carrierId?.slice(0, 8) ?? 'null'} dest=${vehicle.dropoffUnitId?.slice(0, 8) ?? 'null'}`,
+            );
             const destUnitObj = units.find((u) => u.id === vehicle.dropoffUnitId);
             if (vehicle.carrierId && destUnitObj) {
               await supabase
@@ -522,11 +813,13 @@ export function useAcsTickLoop({
             // AMR 상태 초기화
             nextVehicle.currentCommandId      = null;
             nextVehicle.currentMacroCommandId = null;
-            nextVehicle.pickupUnitId          = null;
+            nextVehicle.carrierId             = null;
             nextVehicle.dropoffUnitId         = null;
             nextVehicle.microCommandIds       = [];
-            nextVehicle.currentPath           = [];
-            nextVehicle.pathIndex             = 0;
+            nextVehicle.returningHome         = false;
+
+            // 홈(충전소)으로 복귀 경로 계산 — startHomeReturn 헬퍼로 위임
+            await startHomeReturn(nextVehicle, curUnit);
           }
         }
 
@@ -595,7 +888,7 @@ export function useAcsTickLoop({
     };
   }, [stop]);
 
-  return { acsState, isLeaderTab, start, stop };
+  return { acsState, isLeaderTab, start, stop, requestReturnHome };
 }
 
 // ─── RTD 반송 완료 알림 헬퍼 (fire & forget) ─────────────────────────

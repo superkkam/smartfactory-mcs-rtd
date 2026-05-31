@@ -18,10 +18,10 @@ export const ChargeNode = memo(function ChargeNode({
     <div className="relative flex h-8 w-8 items-center justify-center">
       {/* 4방향 핸들 */}
       {/* ConnectionMode.Loose: source 핸들끼리 연결 가능 → 모든 방향 source 로 통일 */}
-      <Handle type="source" position={Position.Top}    id="t" className="!h-3 !w-3 !bg-orange-500 !border-orange-700" />
-      <Handle type="source" position={Position.Left}   id="l" className="!h-3 !w-3 !bg-orange-500 !border-orange-700" />
-      <Handle type="source" position={Position.Bottom} id="b" className="!h-3 !w-3 !bg-orange-500 !border-orange-700" />
-      <Handle type="source" position={Position.Right}  id="r" className="!h-3 !w-3 !bg-orange-500 !border-orange-700" />
+      <Handle type="source" position={Position.Top}    id="t" className="!h-1.5 !w-1.5 !bg-orange-400 !border-orange-600 !-top-1" />
+      <Handle type="source" position={Position.Left}   id="l" className="!h-1.5 !w-1.5 !bg-orange-400 !border-orange-600 !-left-1" />
+      <Handle type="source" position={Position.Bottom} id="b" className="!h-1.5 !w-1.5 !bg-orange-400 !border-orange-600 !-bottom-1" />
+      <Handle type="source" position={Position.Right}  id="r" className="!h-1.5 !w-1.5 !bg-orange-400 !border-orange-600 !-right-1" />
 
       {/* 충전소 SVG — 육각형 + 번개 */}
       <svg width="32" height="32" viewBox="0 0 32 32">
