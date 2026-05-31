@@ -1,0 +1,495 @@
+% CAIE Paper Tables --- LaTeX (Elsevier booktabs style)
+% Generated: 2026-05-26
+% Paper: Design and Implementation of MCS-RTD Integrated Control Platform
+%        with LLM-Based No-Code Dispatching Rule Builder and AI-Driven Route Optimization
+% Usage: \input{paper-tables-latex} in main .tex file, or copy individual tables
+%
+% Required packages (add to preamble):
+\usepackage{booktabs}        % \toprule, \midrule, \bottomrule
+\usepackage{multirow}        % \multirow
+\usepackage{threeparttable}  % tablenotes footnotes
+\usepackage{array}           % column formatting
+\usepackage{siunitx}         % number alignment (optional)
+
+
+% ============================================================
+% TABLE 1: LLM Rule Auto-Generation Quality Evaluation (§4.5)
+% ============================================================
+\begin{table}[htbp]
+  \centering
+  \caption{Quality evaluation results of LLM-based automatic rule generation
+           (Claude Sonnet 4.5, $N=25$ natural-language inputs).
+           All 25 inputs passed without a single retry call.}
+  \label{tab:1}
+  \small
+  \begin{threeparttable}
+    \begin{tabular}{lrrrrr}
+      \toprule
+      \textbf{Metric}
+        & \textbf{Overall ($N$=25)}
+        & \textbf{Simple ($N$=6)}
+        & \textbf{Complex ($N$=9)}
+        & \textbf{Sort ($N$=5)}
+        & \textbf{Fallback ($N$=5)} \\
+      \midrule
+      Zod parsing success rate (\%)       & \textbf{100.0} & 100.0 & 100.0 & 100.0 & 100.0 \\
+      Structural validity pass rate (\%)  & \textbf{100.0} & 100.0 & 100.0 & 100.0 & 100.0 \\
+      Avg.\ generation time (s)           & \textbf{7.58}  &  5.34 &  7.34 &  8.05 & 10.24 \\
+      Avg.\ retry count                   & \textbf{0.00}  &  0.00 &  0.00 &  0.00 &  0.00 \\
+      \bottomrule
+    \end{tabular}
+    \begin{tablenotes}
+      \footnotesize
+      \item \textsuperscript{a}~\textbf{Bold} = overall result column.
+      \item \textsuperscript{b}~Structural validity checks: (i)~\texttt{filterSequence} target
+            \texttt{sequence} $<$ source (cycle prevention); (ii)~\texttt{jumpNextSequence}
+            target \texttt{sequence} $>$ source (forward-only jump); (iii)~all
+            \texttt{ruleId}s present in the provided RuleDef set (hallucination prevention).
+      \item \textsuperscript{c}~Generation time increases monotonically with input complexity:
+            Simple $<$ Complex $<$ Sort $<$ Fallback, consistent with additional reasoning
+            tokens required for branching structures.
+    \end{tablenotes}
+  \end{threeparttable}
+\end{table}
+
+
+% ============================================================
+% TABLE 2: Theoretical Comparison of Four Algorithms (§3.3)
+% ============================================================
+\begin{table}[htbp]
+  \centering
+  \caption{Theoretical comparison of the four route-optimization algorithms
+           integrated in the Strategy Registry.}
+  \label{tab:2}
+  \small
+  \begin{threeparttable}
+    \begin{tabular}{lllll}
+      \toprule
+      \textbf{Attribute}
+        & \textbf{A*}
+        & \textbf{PPO}
+        & \textbf{CBS-TS}
+        & \textbf{CACTUS} \\
+      \midrule
+      Type
+        & Search (shortest path)
+        & Single-agent RL
+        & Multi-agent search
+        & Multi-agent RL \\
+      Reference
+        & Hart et al., 1968~[11]
+        & Schulman et al., 2017~[5]
+        & arXiv:2510.21738~[13]
+        & Phan, AAMAS 2024~[15] \\
+      No.\ of agents
+        & 1
+        & 1
+        & $N$ ($\leq$20 practical)
+        & $N$ (trained $N$=2) \\
+      Conflict handling
+        & None
+        & None
+        & CBS optimal
+        & QMIX cooperative \\
+      Optimality
+        & Single-agent optimal
+        & Approximate
+        & Sum-of-costs optimal
+        & Approximate (policy) \\
+      Inference complexity
+        & $O((V{+}E)\log V)$
+        & $O(1)$
+        & NP-hard (general)
+        & $O(1)$ distributed \\
+      Training required
+        & No
+        & Yes (SB3 PPO)
+        & No
+        & Yes (QMIX) \\
+      Fallback
+        & ---
+        & A*
+        & A*
+        & A* \\
+      \bottomrule
+    \end{tabular}
+    \begin{tablenotes}
+      \footnotesize
+      \item \textsuperscript{a}~All strategies share the common interface:
+            \texttt{predict(graph, source\_id, dest\_id, unit\_labels, dynamic\_weights)}
+            $\rightarrow$ \texttt{(path, cost, confidence)}.
+      \item \textsuperscript{b}~CBS-TS~[13] integrates MLA* (Multi-Label A*), CBS conflict
+            resolution, and MILP-based task assignment in a hierarchical framework
+            for heterogeneous AMR fleets.
+      \item \textsuperscript{c}~CACTUS~[15] combines QMIX Hypernetwork Mixer with
+            Confidence-Based Reverse Curriculum Learning for CTDE multi-agent path
+            finding on real factory graphs.
+    \end{tablenotes}
+  \end{threeparttable}
+\end{table}
+
+
+% ============================================================
+% TABLE 3: Related Work Comparison --- C1~C5 Feature Coverage (§2.1)
+% ============================================================
+\begin{table}[htbp]
+  \centering
+  \caption{Comparison of related systems against the five contributions
+           (C1--C5) of the proposed platform.}
+  \label{tab:3}
+  \small
+  \begin{threeparttable}
+    \begin{tabular}{llllll}
+      \toprule
+      \textbf{Feature}
+        & \textbf{THiRA-MCS}
+        & \textbf{OpenTCS}
+        & \textbf{LLM4Workflow~[1]}
+        & \textbf{Prior AMHS Studies}
+        & \textbf{This Work} \\
+      \midrule
+      MCS--RTD integration (C1)
+        & Separated
+        & Separated
+        & N/A
+        & Partial
+        & \checkmark~Unified \\
+      No-code rule builder (C2)
+        & None
+        & None
+        & Generic workflow
+        & None
+        & \checkmark~Mfg.-specific \\
+      LLM NL interface (C5)
+        & None
+        & None
+        & RAG-based
+        & None
+        & \checkmark~Few-shot + Tool Use \\
+      Multi-agent RL routing (C3)
+        & None
+        & None
+        & None
+        & Partial
+        & \checkmark~4-algo comparison \\
+      Integrated simulation (C4)
+        & None
+        & Partial
+        & None
+        & Partial
+        & \checkmark~SimPy 12 metrics \\
+      \bottomrule
+    \end{tabular}
+    \begin{tablenotes}
+      \footnotesize
+      \item \textsuperscript{a}~THiRA-MCS (LS Tira Utec): commercial MCS adopting
+            Macro-/Micro-Command hierarchy; RTD runs SQL-based dispatching rules in a
+            separate process communicating via periodic polling.
+      \item \textsuperscript{b}~OpenTCS (Fraunhofer IML): open-source FMS supporting
+            AGV/AMR path control, but without AI-based dynamic routing or
+            NL rule management.
+      \item \textsuperscript{c}~LLM4Workflow~[1] generates scientific experiment workflow
+            nodes via RAG over API documentation; it does not target manufacturing
+            dispatching schemas or provide dry-run validation pipelines.
+      \item \textsuperscript{d}~Prior AMHS studies include MARL/DRL-based scheduling works
+            \cite{[2],[7],[8],[19],[20]} that address dispatching or routing in
+            isolation, without a unified no-code+MAPF platform.
+    \end{tablenotes}
+  \end{threeparttable}
+\end{table}
+
+
+% ============================================================
+% TABLE 4: Evaluation Metric Definitions (§4.2)
+% ============================================================
+\begin{table}[htbp]
+  \centering
+  \caption{Evaluation metrics used in the simulation experiments.
+           Domain metrics (D1--D7) are defined for the AMHS dispatching context;
+           MAPF standard metrics (M1--M5) follow Stern et al.~[3].}
+  \label{tab:4}
+  \small
+  \begin{threeparttable}
+    \begin{tabular}{clll}
+      \toprule
+      \textbf{ID} & \textbf{Metric} & \textbf{Definition} & \textbf{Note} \\
+      \midrule
+      \multicolumn{4}{l}{\textit{Domain Metrics (7 metrics)}} \\
+      \midrule
+      D1 & avg\_transfer\_time  & Mean transfer completion time (s)               & Primary metric \\
+      D2 & throughput           & Completed transfers per 100\,s                   & Productivity   \\
+      D3 & collision\_count     & Number of inter-agent collisions                  & Safety         \\
+      D4 & load\_balance\_std   & Std.\ dev.\ of per-AMR travel distance            & Load balance   \\
+      D5 & equipment\_utilization & Mean equipment utilization (\%)                & Equipment eff. \\
+      D6 & deadlock\_count      & Number of deadlock occurrences                    & Stability      \\
+      D7 & route\_efficiency\_score & Actual path cost / optimal path cost         & Path quality   \\
+      \midrule
+      \multicolumn{4}{l}{\textit{MAPF Standard Metrics (5 metrics, Stern et al.~[3])}} \\
+      \midrule
+      M1 & makespan             & Total time until all agents complete their tasks  &                \\
+      M2 & sum\_of\_costs       & Sum of individual agent travel costs              &                \\
+      M3 & path\_optimality     & Actual cost / individual optimal cost             &                \\
+      M4 & throughput           & Completed transfers per unit time                 & (same as D2)   \\
+      M5 & flowtime             & Sum of per-agent completion times                 &                \\
+      \bottomrule
+    \end{tabular}
+    \begin{tablenotes}
+      \footnotesize
+      \item \textsuperscript{a}~All metrics are collected automatically by the SimPy
+            discrete-event simulator over 30 independent random seeds per scenario.
+      \item \textsuperscript{b}~\texttt{route\_efficiency\_score} (D7) and
+            \texttt{path\_optimality} (M3) are equivalent in definition;
+            both are reported as a percentage relative to the A* optimal path cost.
+    \end{tablenotes}
+  \end{threeparttable}
+\end{table}
+
+
+% ============================================================
+% TABLE 5: avg_transfer_time Comparison (§4.4)
+% ============================================================
+\begin{table}[htbp]
+  \centering
+  \caption{Comparison of \texttt{avg\_transfer\_time} (seconds) across three scenarios
+           and four algorithms (mean $\pm$ std over 30 independent seeds).
+           Kruskal--Wallis $p$-values confirm statistically significant group differences
+           in all scenarios.}
+  \label{tab:5}
+  \small
+  \begin{threeparttable}
+    \begin{tabular}{lccccc}
+      \toprule
+      \textbf{Scenario}
+        & \textbf{A*}
+        & \textbf{PPO-RL}
+        & \textbf{CACTUS}
+        & \textbf{CBS-TS}
+        & \textbf{KW ($p$)} \\
+      \midrule
+      S1: 8\,AGV / 100\,tasks
+        & \textbf{27.48 $\pm$ 1.84}
+        & 29.51 $\pm$ 2.05
+        & 27.75 $\pm$ 1.76
+        & 27.48 $\pm$ 1.84
+        & $p{<}0.001^{***}$ \\
+      S2: 16\,AGV / 200\,tasks
+        & \textbf{26.26 $\pm$ 1.24}
+        & 28.08 $\pm$ 1.40
+        & 26.68 $\pm$ 1.20
+        & 26.26 $\pm$ 1.24
+        & $p{<}0.001^{***}$ \\
+      S3: 32\,AGV / 350\,tasks
+        & \textbf{26.45 $\pm$ 0.73}
+        & 28.04 $\pm$ 0.84
+        & 26.76 $\pm$ 0.74
+        & 26.45 $\pm$ 0.73
+        & $p{<}0.001^{***}$ \\
+      \bottomrule
+    \end{tabular}
+    \begin{tablenotes}
+      \footnotesize
+      \item \textsuperscript{a}~\textbf{Bold} = lowest (best) value within each scenario.
+      \item \textsuperscript{b}~Simulated on an 88-node, 272-edge directed weighted factory
+            graph; 30 independent random seeds per (scenario, algorithm) combination.
+      \item \textsuperscript{c}~KW: Kruskal--Wallis $H$ test; significance levels:
+            $^{***}p{<}0.001$.
+            Kruskal--Wallis $H$ statistics: $H{=}18.6$ (S1), $H{=}29.2$ (S2),
+            $H{=}46.9$ (S3), indicating monotonically increasing group divergence
+            with AMR density.
+      \item \textsuperscript{d}~CBS-TS degrades to single-agent mode under online RTD
+            conditions, yielding paths identical to A* (see Table~\ref{tab:6}).
+    \end{tablenotes}
+  \end{threeparttable}
+\end{table}
+
+
+% ============================================================
+% TABLE 6: Wilcoxon Signed-Rank Post-Hoc Tests (§4.4)
+% ============================================================
+\begin{table}[htbp]
+  \centering
+  \caption{Wilcoxon signed-rank post-hoc test results for pairwise
+           \texttt{avg\_transfer\_time} comparisons, with Holm--Bonferroni correction
+           across six pairs (FWER controlled at $\alpha{=}0.05$).
+           $r$ = rank-biserial correlation (effect size).}
+  \label{tab:6}
+  \small
+  \begin{threeparttable}
+    \begin{tabular}{lcccccc}
+      \toprule
+      \multirow{2}{*}{\textbf{Pair}}
+        & \multicolumn{2}{c}{\textbf{S1}}
+        & \multicolumn{2}{c}{\textbf{S2}}
+        & \multicolumn{2}{c}{\textbf{S3}} \\
+      \cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
+        & $p_{\mathrm{adj}}$ & $r$
+        & $p_{\mathrm{adj}}$ & $r$
+        & $p_{\mathrm{adj}}$ & $r$ \\
+      \midrule
+      A* vs.\ PPO
+        & $<$0.001$^{***}$ & 0.798
+        & $<$0.001$^{***}$ & 0.873
+        & $<$0.001$^{***}$ & 0.873 \\
+      A* vs.\ CACTUS
+        & $<$0.001$^{***}$ & 0.689
+        & 0.003$^{**}$     & 0.606
+        & $<$0.001$^{***}$ & 0.873 \\
+      A* vs.\ CBS-TS
+        & 1.000\,ns        & 0.000
+        & 1.000\,ns        & 0.000
+        & 1.000\,ns        & 0.000 \\
+      PPO vs.\ CACTUS
+        & $<$0.001$^{***}$ & 0.749
+        & $<$0.001$^{***}$ & 0.794
+        & $<$0.001$^{***}$ & 0.873 \\
+      PPO vs.\ CBS-TS
+        & $<$0.001$^{***}$ & 0.798
+        & $<$0.001$^{***}$ & 0.873
+        & $<$0.001$^{***}$ & 0.873 \\
+      CACTUS vs.\ CBS-TS
+        & $<$0.001$^{***}$ & 0.689
+        & 0.003$^{**}$     & 0.606
+        & $<$0.001$^{***}$ & 0.873 \\
+      \bottomrule
+    \end{tabular}
+    \begin{tablenotes}
+      \footnotesize
+      \item Significance levels: $^{***}p{<}0.001$,\; $^{**}p{<}0.01$,\;
+            $^{*}p{<}0.05$,\; ns\,$p{\geq}0.05$.
+      \item $r$ = rank-biserial correlation coefficient; $r{\geq}0.5$ indicates
+            a large effect (Cohen's convention).
+      \item A* = CBS-TS in all three scenarios ($p_{\mathrm{adj}}{=}1.0$, $r{=}0.0$):
+            CBS-TS degrades to single-agent path planning under online RTD mode,
+            producing paths identical to A* (online--offline paradigm mismatch; see \S4.4).
+      \item CACTUS partial convergence ($\mu{=}{-}427$; target $\mu{\geq}{-}200$)
+            leads to frequent A* fallback, resulting in statistically significant but
+            operationally small differences (1.0--1.6\%) relative to A*.
+    \end{tablenotes}
+  \end{threeparttable}
+\end{table}
+
+
+% ============================================================
+% TABLE 7: Algorithm Suitability for RTD Operations (§4.4 / §4.6)
+% ============================================================
+\begin{table}[htbp]
+  \centering
+  \caption{Summary of algorithm characteristics and suitability for
+           online RTD (Real-Time Dispatching) operations.}
+  \label{tab:7}
+  \small
+  \begin{threeparttable}
+    \begin{tabular}{lllll}
+      \toprule
+      \textbf{Attribute}
+        & \textbf{A*}
+        & \textbf{CBS-TS}
+        & \textbf{CACTUS}
+        & \textbf{PPO} \\
+      \midrule
+      Operating mode
+        & Online
+        & Offline (batch)
+        & Online (distributed)
+        & Online \\
+      Planning paradigm
+        & Single-agent
+        & Multi-agent (CBS)
+        & Multi-agent (QMIX CTDE)
+        & Single-agent \\
+      Computational complexity
+        & $O(E \log V)$
+        & NP-hard (agents)
+        & $O(1)$ inference
+        & $O(1)$ inference \\
+      Measured performance rank
+        & \textbf{1st}
+        & 1st (= A*)
+        & 3rd
+        & 4th \\
+      Online RTD suitability
+        & High
+        & Online degradation\textsuperscript{a}
+        & Convergence pending\textsuperscript{b}
+        & Cooperation limited\textsuperscript{c} \\
+      \bottomrule
+    \end{tabular}
+    \begin{tablenotes}
+      \footnotesize
+      \item \textsuperscript{a}~CBS-TS requires all task information to be known a priori;
+            under online RTD, it degrades to per-agent single-path planning
+            (identical to A*; Wilcoxon $p{=}1.0$, ns).
+      \item \textsuperscript{b}~CACTUS 2nd training run: $\mu{=}{-}427$
+            (target $\mu{\geq}{-}200$ not reached).
+            A fully converged MARL policy is expected to outperform A* via
+            cooperative collision avoidance; H-CACTUS follow-up study planned.
+      \item \textsuperscript{c}~PPO single-agent policy lacks inter-agent coordination;
+            avg\_transfer\_time is 5.9--7.4\% higher than A* across all scenarios
+            ($p{<}0.001$, $r{=}0.798$--$0.873$).
+    \end{tablenotes}
+  \end{threeparttable}
+\end{table}
+
+
+% ============================================================
+% TABLE 8: Secondary Metrics --- makespan / AMR Utilization /
+%           Throughput / Path Optimality (§4.4)
+% ============================================================
+\begin{table}[htbp]
+  \centering
+  \caption{Secondary metric comparison: makespan, AMR utilization,
+           throughput, and path optimality (mean $\pm$ std, 30 seeds).
+           A* and CBS-TS achieve 100\% path optimality in all scenarios;
+           CACTUS and PPO show partial degradation due to partial convergence
+           and single-agent policy limitations, respectively.}
+  \label{tab:8}
+  \small
+  \begin{threeparttable}
+    \begin{tabular}{llrrrr}
+      \toprule
+      \textbf{Scenario}
+        & \textbf{Algorithm}
+        & \textbf{Makespan (s)}
+        & \textbf{AMR util.\ (\%)}
+        & \textbf{Throughput (/100\,s)}
+        & \textbf{Path opt.\ (\%)} \\
+      \midrule
+      \multirow{4}{*}{S1 (8\,AGV)}
+        & A*      & 297.3 $\pm$ 2.3 & 88.1 $\pm$ 5.1 & 0.255 $\pm$ 0.019 & \textbf{100.0} \\
+        & PPO-RL  & 296.1 $\pm$ 3.4 & 88.8 $\pm$ 3.5 & 0.238 $\pm$ 0.016 & 94.1 $\pm$ 1.6 \\
+        & CACTUS  & 296.7 $\pm$ 2.4 & 88.3 $\pm$ 4.7 & 0.253 $\pm$ 0.018 & 98.7 $\pm$ 0.7 \\
+        & CBS-TS  & 297.3 $\pm$ 2.3 & 88.1 $\pm$ 5.1 & 0.255 $\pm$ 0.019 & \textbf{100.0} \\
+      \midrule
+      \multirow{4}{*}{S2 (16\,AGV)}
+        & A*      & 298.6 $\pm$ 1.2 & 88.7 $\pm$ 3.2 & 0.539 $\pm$ 0.032 & \textbf{100.0} \\
+        & PPO-RL  & 297.8 $\pm$ 1.9 & 89.0 $\pm$ 2.7 & 0.504 $\pm$ 0.031 & 94.2 $\pm$ 0.9 \\
+        & CACTUS  & 298.6 $\pm$ 1.2 & 89.0 $\pm$ 2.8 & 0.532 $\pm$ 0.030 & 98.7 $\pm$ 0.6 \\
+        & CBS-TS  & 298.6 $\pm$ 1.2 & 88.7 $\pm$ 3.2 & 0.539 $\pm$ 0.032 & \textbf{100.0} \\
+      \midrule
+      \multirow{4}{*}{S3 (32\,AGV)}
+        & A*      & 597.3 $\pm$ 2.4 & 46.1 $\pm$ 2.1 & 0.555 $\pm$ 0.021 & \textbf{100.0} \\
+        & PPO-RL  & 597.7 $\pm$ 2.0 & 48.7 $\pm$ 2.1 & 0.553 $\pm$ 0.021 & 94.2 $\pm$ 0.7 \\
+        & CACTUS  & 597.4 $\pm$ 2.4 & 46.6 $\pm$ 2.2 & 0.554 $\pm$ 0.021 & 98.7 $\pm$ 0.4 \\
+        & CBS-TS  & 597.3 $\pm$ 2.4 & 46.1 $\pm$ 2.1 & 0.555 $\pm$ 0.021 & \textbf{100.0} \\
+      \bottomrule
+    \end{tabular}
+    \begin{tablenotes}
+      \footnotesize
+      \item \textsuperscript{a}~\textbf{Bold} = 100.0\% (perfect path optimality; no deviation
+            from A*-optimal routes).
+      \item \textsuperscript{b}~S3 makespan ($\approx$597\,s) is approximately twice that of
+            S1/S2 ($\approx$298\,s), reflecting the cumulative load of 32\,AGVs
+            completing 350 transfer tasks.
+      \item \textsuperscript{c}~AMR utilization drops sharply from 88--89\% (S1, S2) to
+            46\% (S3), indicating increased idle/waiting time at charging stations
+            and pre-transfer queues under high-density conditions.
+      \item \textsuperscript{d}~PPO's elevated AMR utilization in S3 (+2.6\% vs.\ A*)
+            arises from additional movement attempts during exploratory path search,
+            not from improved task throughput.
+      \item \textsuperscript{e}~Path optimality: A* and CBS-TS maintain 100\% in all
+            scenarios; CACTUS 98.7\% due to partial-convergence A* fallback;
+            PPO 94.1--94.2\% due to collision-avoidance detours in a
+            single-agent policy without inter-agent coordination.
+    \end{tablenotes}
+  \end{threeparttable}
+\end{table}

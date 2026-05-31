@@ -211,6 +211,21 @@ RTD 노코드 룰 빌더 플랫폼은 스마트팩토리 현장 엔지니어를 
   - GitHub Actions CI/CD 파이프라인 구성 (lint, type-check, build)
   - 환경 변수 관리 (`.env.production` 설정)
 
+- ✅ **Task 026: RTD 매핑 UI — MCS 포트 드롭다운 연동** — 완료
+  - `apps/mcs/app/api/equipment-units/ports/route.ts`: 최신 레이아웃 기준 Port 타입 유닛만 반환
+  - `apps/rtd/lib/api/mcs-ports.ts`: `useMcsPorts()` 훅 — MCS API 호출
+  - `apps/rtd/lib/api/rule-objects.ts`: `useCreateRuleObject`, `useDeleteRuleObject` 뮤테이션 추가
+  - `apps/rtd/components/rule-groups/equipment-mapping-panel.tsx`: 매핑 추가/삭제 UI — MCS 포트 드롭다운(Port만 노출) + 이벤트 유형 선택 + 중복 방지
+  - `apps/rtd/app/(app)/rule-groups/page.tsx`: 기존 정적 매핑 카드 → `EquipmentMappingPanel` 교체
+
+- **Task 025: LoadRequest → 캐리어 선택 → MCS 전달 End-to-End 플로우 완성** — 우선순위
+  - `/api/message` 완성: 포트 ID → `rule_object` 매핑 조회 → 룰 실행 → 1순위 캐리어 선택
+  - 선택된 캐리어의 `location_id` → 출발지 unit, 요청 포트 → 목적지 unit 패키징
+  - MCS `/api/dispatch` 호출: MacroCommand 생성 요청 전송
+  - MCS 반송 완료 콜백 수신 → `rule_running_result` 완료 상태 업데이트
+  - RTD 모니터링 대시보드에 디스패칭 결과 실시간 표시 (캐리어 ID / 출발지 / 목적지 / 상태)
+  - Playwright E2E 검증: LoadRequest 전송 → 룰 실행 로그 등장 → MCS 전달 확인
+
 ---
 
 ### Phase 5: LLM 자연어 룰 생성 보조 기능 (프로토타입)
@@ -243,9 +258,9 @@ RTD 노코드 룰 빌더 플랫폼은 스마트팩토리 현장 엔지니어를 
 | Phase 1: 애플리케이션 골격 구축 | ✅ 완료 | 3 | 3/3 |
 | Phase 2: UI/UX 완성 (더미 데이터) | ✅ 완료 | 8 | 8/8 |
 | Phase 3: 핵심 기능 구현 | ✅ 완료 | 7 | 7/7 |
-| Phase 4: 실시간 모니터링 + 배포 | 진행 중 | 4 | 3/4 |
+| Phase 4: 실시간 모니터링 + 배포 | 진행 중 | 6 | 4/6 |
 | Phase 5: LLM 자연어 룰 생성 (프로토타입) | 진행 중 | 2 | 0/2 |
-| **합계** | | **24** | **21/24** |
+| **합계** | | **25** | **21/25** |
 
 ---
 

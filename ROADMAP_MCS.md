@@ -301,25 +301,58 @@ MCS 플랫폼은 스마트팩토리 연구원 및 현장 엔지니어를 위한 
     - AI 엔진 단위 테스트: `tests/test_strategy_dispatch.py` (8 케이스)
     - E2E 테스트: `tests/e2e/11-algorithm-enum.spec.ts`
 
-- **Task 025: CACTUS 통합** — 진행 예정
-  - PPO 다중 에이전트 학습 루프 (PettingZoo ParallelEnv → SB3)
-  - QMIX Mixer 구현 (PyTorch, CTDE monotonic value factorization)
-  - Reverse Curriculum 자동 난이도 확장 (`μ−η·σ ≥ U` 수렴 검증)
-  - MAPF Grid 8×8 환경에서 학습 (obstacle 회피, 충돌 없는 경로)
-  - A* / PPO 대비 makespan / throughput / collision rate 비교 실험
+- ✅ **Task 025: CACTUS 통합** — 스모크 학습 + 추론 통합 완료 (2026-05-04)
+  - `engine/cactus/multi_agent_env.py`: PettingZoo ParallelEnv 기반 GraphMAPFEnv 구현 — 실 layout NetworkX DiGraph 위에서 멀티에이전트 MAPF, vertex/edge swap 충돌 처리, `sample_agent_tasks()` Reverse Curriculum 연동
+  - `engine/cactus/qmix_mixer.py`: QMixMixer(nn.Module) 하이퍼네트워크 구현 — abs() 단조성 보장, (B, n_agents) + (B, state_dim) → (B, 1)
+  - `engine/cactus/qmix_agent.py`: QmixAgent 싱글턴 — 체크포인트 load/predict_single(A* fallback), PpoAgent 패턴 미러
+  - `engine/cactus/train.py`: ε-greedy + ReplayBuffer + QMix 학습 루프, ReverseCurriculumScheduler 통합, 합성 그래프/실 layout 양쪽 지원
+  - `engine/strategy.py:CactusStrategy`: predict() 활성화, is_available = qmix_agent.is_loaded
+  - `main.py` lifespan: qmix_agent.load(cactus_model_path) 추가
+  - `config.py`: cactus_model_path 필드 추가
+  - `components/simulation/scenario-form.tsx`: AlgorithmKey에 'cactus' 추가, "CACTUS (Smoke)" 선택지 노출
+  - 스모크 학습 결과: 200 ep, reward -880 → +65 수렴 방향, `trained_models/cactus_qmix.pt` 생성
+  - 단위 테스트 65 케이스 **65/65 PASS** (test_qmix_mixer 4건, test_mapf_env 7건 신규)
+  - 후속 사이클: 본 학습(1만~5만 ep), 배치 멀티에이전트 rollout, MAPF 표준 벤치마크 비교 (Task 027 의존)
 
-- **Task 026: CBS-TS 통합** — 진행 예정
-  - MILP 작업 순서 최적화 (`pulp`, makespan 최소화, AMR 호환성 제약)
-  - CBS High-Level: Constraint Tree + Vertex/Edge/Following 충돌 분류
-  - MLA* Low-Level: 이종 AMR 유형 라벨 기반 경로 탐색
-  - Search Forest 구조 (다중 루트 트리 병렬 탐색, 제약 재사용)
-  - CBS-TS vs CACTUS vs A* 이종 AMR 시나리오 비교
+- ✅ **Task 026: CBS-TS 통합** — 완료 (2026-04-26)
+  - `engine/cbs_ts/mla_star.py`: MLA* 구현 — 이종 AMR 호환성 필터(TYPE_A/B/C), CBS vertex/edge constraint 반영, goal_sequence 멀티-stop 지원, `mla_star_with_time()` 시간축 확장
+  - `engine/cbs_ts/milp_task_order.py`: pulp(CBC) 기반 MILP — makespan 최소화, AMR 호환성/deadline/직렬화 제약, greedy fallback 지원
+  - `engine/cbs_ts/cbs_high_level.py`: CBS High-Level — vertex/edge conflict 탐지 + CT Best-First 탐색 + MLA* 재계산 루프, 30초 시간 제한
+  - `engine/cbs_ts/search_forest.py`: SearchForest.merge_solutions() 구현 — CBS 솔루션 패킹/병합
+  - `engine/cbs_ts/__init__.py`: `solve_multi_agent()` — MILP → CBS 파이프라인 단일 진입점
+  - `engine/strategy.py:CbsTsStrategy`: `predict()` 활성화 (MLA* 단독, confidence=1.0, `is_available` = pulp 설치 여부)
+  - 단위 테스트 30개 (test_mla_star / test_cbs_high_level / test_milp_task_order / test_strategy_dispatch / test_cbs_ts_integration) — **30/30 PASS** (10.6초)
 
-- **Task 027: MAPF 평가 + 논문 데이터 수집** — 진행 예정
-  - 8~128 AMR 스케일 비교 (ASTAR / AI_PPO / CACTUS / CBS_TS)
+- **Task 028: LoadRequest 트리거 UI + SEMI E2E 시나리오 구현** — 우선순위
+  - MCS 대시보드 포트 노드 우클릭 → "LoadRequest 발생" 컨텍스트 메뉴
+  - RTD `/api/message` 호출 → 디스패칭 결과(캐리어 ID / 출발지 / 목적지) 수신
+  - 수신된 MacroCommand → ACS tick loop 연동 → AMR 자동 이동 시작
+  - 반송 제어 페이지: RTD 수신 배지 + 자동 생성된 MacroCommand 표시
+  - SEMI E82 상태 전이 배지 실시간 표시 (Idle → MovingEmpty → Acquiring → MovingLoaded → Depositing → Idle)
+  - 반송 완료 후 RTD 완료 콜백 자동 전송 (`/api/rtd/complete`)
+  - Playwright E2E 검증: LoadRequest 발생 → AMR 이동 애니메이션 → 완료 콜백 확인
+
+- **Task 029: 최종 발표 데모 시나리오 구현 + 시더** — 우선순위
+  - 데모용 레이아웃·캐리어·룰 시드 데이터 구성 (기존 레이아웃 활용)
+  - 시나리오 A (MCS 단독 — AI 알고리즘 비교):
+    - 4개 알고리즘 비교 시뮬레이션 실행 (A* / PPO / CACTUS / CBS-TS)
+    - 7개 지표 비교 테이블 + 개선율 배지 + 히스토그램
+    - ReplayCanvas 알고리즘 탭 전환 시연
+  - 시나리오 B (RTD 단독): `docs/demo-scenarios.md` 참조
+  - 시나리오 C (MCS-RTD 통합): `docs/demo-scenarios.md` 참조
+  - `docs/demo-scenarios.md` 상세 시나리오 문서 작성
+
+- **Task 027: MAPF 평가 + 논문 데이터 수집** — 진행 중
+  - 8~128 AMR 스케일 비교 (ASTAR / AI_PPO / CACTUS / CBS_TS) — 후속 사이클
   - 주요 지표: makespan, throughput, collision_rate, 학습 수렴 시간
-  - CSV / PNG 자동 산출 파이프라인 (논문 그림/표 생성)
-  - Playwright 통합 검증 업데이트 (Task 025/026 완성 후)
+  - CSV / PNG 자동 산출 파이프라인 (논문 그림/표 생성) — 후속 사이클
+
+**Task 027-B: 실제 레이아웃 기반 시뮬레이션 결과 재생 뷰** ✅ 완료
+  - backend: MetricsCollector.summary()에 agent_traces 직렬화 추가
+  - 공유 타입: AgentTrace 인터페이스 + SimulationResult.agentTraces 필드
+  - frontend: useSimulationRun() 훅, ReplayCanvas 컴포넌트 (알고리즘 탭 전환, 전체 N대 재생)
+  - 결과 페이지 통합: 개선율 배지와 비교 테이블 사이에 재생 뷰 카드 삽입
+  - 비고: Playground(추상 그리드)와 분리 유지 — 환경 불일치로 통합 폐기
 
 ---
 
@@ -331,5 +364,5 @@ MCS 플랫폼은 스마트팩토리 연구원 및 현장 엔지니어를 위한 
 | Phase 2: UI/UX 완성 (더미 데이터) | ✅ 완료 | 7 | 7/7 |
 | Phase 3: 핵심 기능 구현 | ✅ 완료 | 9 | 9/9 |
 | Phase 4: 실시간 모니터링 + 배포 | 진행 중 | 5 | 4/5 |
-| Phase 5: MAPF 알고리즘 확장 (논문용) | 진행 중 | 4 | 1/4 |
-| **합계** | | **28** | **24/28** |
+| Phase 5: MAPF 알고리즘 확장 + 데모 | 진행 중 | 6 | 2/6 |
+| **합계** | | **30** | **25/30** |

@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>CAIE 논문 표 — HWP 삽입용</title>
+<style>
+  body {
+    font-family: 'Times New Roman', 'Batang', serif;
+    font-size: 10pt;
+    background: #fff;
+    color: #000;
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 30px 40px;
+  }
+
+  /* ── 사용 안내 배너 (복사 시 포함 안 됨) ── */
+  .banner {
+    font-family: 'Malgun Gothic', sans-serif;
+    font-size: 9pt;
+    background: #e8f0fe;
+    border-left: 4px solid #1a56db;
+    padding: 10px 16px;
+    margin-bottom: 40px;
+    color: #1a1a1a;
+    line-height: 1.8;
+  }
+  .banner b { color: #1a56db; }
+
+  /* ── 표 섹션 구분 ── */
+  .tbl-section {
+    margin-bottom: 48px;
+    page-break-inside: avoid;
+  }
+
+  /* ── 표 캡션 (논문 스타일: 표 위에 위치) ── */
+  .tbl-caption {
+    font-family: 'Times New Roman', 'Batang', serif;
+    font-size: 10pt;
+    font-weight: bold;
+    margin-bottom: 6px;
+    text-align: left;
+  }
+
+  /* ── 본문 표 — booktabs 스타일 (세로선 없음) ── */
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-family: 'Times New Roman', 'Batang', serif;
+    font-size: 9.5pt;
+  }
+
+  /* 최상단 이중 가로선 */
+  thead tr:first-child th {
+    border-top: 2px solid #000;
+  }
+  /* 헤더 하단 단선 */
+  thead tr:last-child th {
+    border-bottom: 1px solid #000;
+  }
+  /* 최하단 이중 가로선 */
+  tbody tr:last-child td {
+    border-bottom: 2px solid #000;
+  }
+
+  th, td {
+    border: none;
+    padding: 5px 10px;
+    text-align: left;
+    vertical-align: middle;
+    line-height: 1.5;
+  }
+  th {
+    font-weight: bold;
+    background: #fff;
+  }
+  td {
+    background: #fff;
+  }
+
+  /* 숫자 열 오른쪽 정렬 */
+  .num { text-align: right; }
+  .ctr { text-align: center; }
+
+  /* 소구분 헤더 행 (도메인/MAPF 등) */
+  .subhead td {
+    font-weight: bold;
+    font-style: italic;
+    border-top: 1px solid #000;
+    border-bottom: none;
+    padding-top: 8px;
+  }
+
+  /* 그룹 구분선 */
+  .group-sep td {
+    border-top: 1px solid #999;
+  }
+
+  /* 표 각주 */
+  .tbl-note {
+    font-family: 'Times New Roman', 'Batang', serif;
+    font-size: 8.5pt;
+    color: #222;
+    margin-top: 4px;
+    line-height: 1.6;
+  }
+
+  hr.tbl-divider {
+    border: none;
+    border-top: 1px solid #ccc;
+    margin: 36px 0;
+  }
+
+  sup { font-size: 7pt; }
+  .best { font-weight: bold; }
+</style>
+</head>
+<body>
+
+<div class="banner">
+  <b>📋 HWP 삽입 방법</b><br>
+  원하는 표를 마우스로 드래그 선택 → <b>Ctrl+C</b> → HWP 붙여넣기(<b>Ctrl+V</b>)<br>
+  ※ 캡션 텍스트도 함께 선택해서 복사하세요. 표 구조(행·열)가 그대로 유지됩니다.
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!--  표 1. LLM 기반 룰 자동 생성 품질 평가 결과          -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div class="tbl-section">
+<div class="tbl-caption">표 1. LLM 기반 룰 자동 생성 품질 평가 결과 (모델: Claude Sonnet 4.5, N=25)</div>
+<table>
+  <thead>
+    <tr>
+      <th>지표</th>
+      <th class="ctr">전체<br>(N=25)</th>
+      <th class="ctr">단순<br>(N=6)</th>
+      <th class="ctr">복합<br>(N=9)</th>
+      <th class="ctr">정렬<br>(N=5)</th>
+      <th class="ctr">Fallback<br>(N=5)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Zod 파싱 성공률 (%)</td>
+      <td class="ctr best">100.0</td>
+      <td class="ctr">100.0</td>
+      <td class="ctr">100.0</td>
+      <td class="ctr">100.0</td>
+      <td class="ctr">100.0</td>
+    </tr>
+    <tr>
+      <td>구조 불변성 통과율 (%)</td>
+      <td class="ctr best">100.0</td>
+      <td class="ctr">100.0</td>
+      <td class="ctr">100.0</td>
+      <td class="ctr">100.0</td>
+      <td class="ctr">100.0</td>
+    </tr>
+    <tr>
+      <td>평균 생성 시간 (초)</td>
+      <td class="ctr best">7.58</td>
+      <td class="ctr">5.34</td>
+      <td class="ctr">7.34</td>
+      <td class="ctr">8.05</td>
+      <td class="ctr">10.24</td>
+    </tr>
+    <tr>
+      <td>평균 재시도 횟수</td>
+      <td class="ctr best">0.00</td>
+      <td class="ctr">0.00</td>
+      <td class="ctr">0.00</td>
+      <td class="ctr">0.00</td>
+      <td class="ctr">0.00</td>
+    </tr>
+  </tbody>
+</table>
+<p class="tbl-note">
+  <sup>a</sup> 구조 불변성 검증 기준 3가지: (i) filterSequence 타깃 블록의 sequence &lt; 소스 (순환 방지);
+  (ii) jumpNextSequence 타깃 블록의 sequence &gt; 소스 (전진 점프 강제);
+  (iii) 모든 ruleId ∈ 제공된 RuleDef 집합 (환각 방지).<br>
+  <sup>b</sup> 생성 시간은 단순 &lt; 복합 &lt; 정렬 &lt; Fallback 순으로 단조 증가 (분기 구조 생성에 필요한 추론 토큰 증가 반영).
+</p>
+</div>
+
+<hr class="tbl-divider">
+
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!--  표 2. 4종 알고리즘 이론 비교                        -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div class="tbl-section">
+<div class="tbl-caption">표 2. 4종 경로 최적화 알고리즘 이론 비교</div>
+<table>
+  <thead>
+    <tr>
+      <th>항목</th>
+      <th class="ctr">A*</th>
+      <th class="ctr">PPO</th>
+      <th class="ctr">CBS-TS</th>
+      <th class="ctr">CACTUS</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>유형</td>
+      <td>탐색 (최단 경로)</td>
+      <td>단일 에이전트 RL</td>
+      <td>다중 에이전트 탐색</td>
+      <td>다중 에이전트 RL</td>
+    </tr>
+    <tr>
+      <td>참고 문헌</td>
+      <td>Hart et al., 1968 [11]</td>
+      <td>Schulman et al., 2017 [5]</td>
+      <td>arXiv:2510.21738 [13]</td>
+      <td>Phan, AAMAS 2024 [15]</td>
+    </tr>
+    <tr>
+      <td>에이전트 수</td>
+      <td class="ctr">1</td>
+      <td class="ctr">1</td>
+      <td class="ctr">N (≤20 실용)</td>
+      <td class="ctr">N (학습: N=2)</td>
+    </tr>
+    <tr>
+      <td>충돌 처리</td>
+      <td>없음</td>
+      <td>없음</td>
+      <td>CBS 최적 해소</td>
+      <td>QMIX 협력 학습</td>
+    </tr>
+    <tr>
+      <td>최적성</td>
+      <td>단일 에이전트 최적</td>
+      <td>근사</td>
+      <td>sum-of-costs 최적</td>
+      <td>근사 (정책 기반)</td>
+    </tr>
+    <tr>
+      <td>추론 복잡도</td>
+      <td class="ctr">O((V+E)logV)</td>
+      <td class="ctr">O(1)</td>
+      <td class="ctr">NP-hard</td>
+      <td class="ctr">O(1) 분산</td>
+    </tr>
+    <tr>
+      <td>학습 필요</td>
+      <td class="ctr">없음</td>
+      <td class="ctr">필요 (SB3 PPO)</td>
+      <td class="ctr">없음</td>
+      <td class="ctr">필요 (QMIX)</td>
+    </tr>
+    <tr>
+      <td>Fallback</td>
+      <td class="ctr">—</td>
+      <td class="ctr">A*</td>
+      <td class="ctr">A*</td>
+      <td class="ctr">A*</td>
+    </tr>
+  </tbody>
+</table>
+<p class="tbl-note">
+  RL = Reinforcement Learning; CBS = Conflict-Based Search; CTDE = Centralized Training Decentralized Execution;
+  QMIX = monotonic value function factorization (Rashid et al., 2018 [4]).
+</p>
+</div>
+
+<hr class="tbl-divider">
+
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!--  표 3. 관련 연구 비교 (C1~C5 기능 지원 현황)         -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div class="tbl-section">
+<div class="tbl-caption">표 3. 관련 시스템 기능 비교 — 기여사항 C1~C5 지원 현황</div>
+<table>
+  <thead>
+    <tr>
+      <th>항목</th>
+      <th class="ctr">THiRA-MCS</th>
+      <th class="ctr">OpenTCS</th>
+      <th class="ctr">LLM4Workflow<br>[1]</th>
+      <th class="ctr">선행 AMHS<br>연구들</th>
+      <th class="ctr"><b>본 연구</b></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>MCS-RTD 통합 (C1)</td>
+      <td class="ctr">분리</td>
+      <td class="ctr">분리</td>
+      <td class="ctr">해당 없음</td>
+      <td class="ctr">부분</td>
+      <td class="ctr best">✔ 통합</td>
+    </tr>
+    <tr>
+      <td>노코드 룰 빌더 (C2)</td>
+      <td class="ctr">없음</td>
+      <td class="ctr">없음</td>
+      <td class="ctr">범용 워크플로우</td>
+      <td class="ctr">없음</td>
+      <td class="ctr best">✔ 제조 특화</td>
+    </tr>
+    <tr>
+      <td>LLM 자연어 인터페이스 (C5)</td>
+      <td class="ctr">없음</td>
+      <td class="ctr">없음</td>
+      <td class="ctr">RAG 기반</td>
+      <td class="ctr">없음</td>
+      <td class="ctr best">✔ Few-shot+Tool Use</td>
+    </tr>
+    <tr>
+      <td>다중 에이전트 RL 경로 최적화 (C3)</td>
+      <td class="ctr">없음</td>
+      <td class="ctr">없음</td>
+      <td class="ctr">없음</td>
+      <td class="ctr">일부</td>
+      <td class="ctr best">✔ 4종 비교</td>
+    </tr>
+    <tr>
+      <td>통합 시뮬레이션 평가 (C4)</td>
+      <td class="ctr">없음</td>
+      <td class="ctr">부분</td>
+      <td class="ctr">없음</td>
+      <td class="ctr">부분</td>
+      <td class="ctr best">✔ SimPy 12지표</td>
+    </tr>
+  </tbody>
+</table>
+<p class="tbl-note">
+  THiRA-MCS: LS티라유텍 상용 MCS. OpenTCS: Fraunhofer IML 오픈소스 차량 관제 시스템.
+  LLM4Workflow: Xu et al., ASE 2024 [1]. 선행 AMHS 연구: [7,8,19,20,21] 포함.
+</p>
+</div>
+
+<hr class="tbl-divider">
+
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!--  표 4. 평가 지표 정의                                 -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div class="tbl-section">
+<div class="tbl-caption">표 4. 시뮬레이션 실험 평가 지표 정의</div>
+<table>
+  <thead>
+    <tr>
+      <th style="width:22%">지표</th>
+      <th style="width:55%">정의</th>
+      <th style="width:23%">비고</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr class="subhead">
+      <td colspan="3">도메인 지표 (D1–D7)</td>
+    </tr>
+    <tr>
+      <td>avg_transfer_time</td>
+      <td>반송 완료까지 평균 소요 시간 (초)</td>
+      <td>핵심 지표</td>
+    </tr>
+    <tr>
+      <td>throughput</td>
+      <td>단위 시간(100초)당 완료 반송 수</td>
+      <td>생산성</td>
+    </tr>
+    <tr>
+      <td>collision_count</td>
+      <td>에이전트 간 충돌 발생 횟수</td>
+      <td>안전성</td>
+    </tr>
+    <tr>
+      <td>load_balance_std</td>
+      <td>AMR별 이동 거리 표준편차</td>
+      <td>부하 균형</td>
+    </tr>
+    <tr>
+      <td>equipment_utilization</td>
+      <td>장비 평균 가동률 (%)</td>
+      <td>장비 효율</td>
+    </tr>
+    <tr>
+      <td>deadlock_count</td>
+      <td>교착 상태 발생 횟수</td>
+      <td>안정성</td>
+    </tr>
+    <tr>
+      <td>route_efficiency_score</td>
+      <td>실제 경로 비용 / 최적 경로 비용</td>
+      <td>경로 품질</td>
+    </tr>
+    <tr class="subhead">
+      <td colspan="3">MAPF 표준 지표 (M1–M5) <sup>a</sup></td>
+    </tr>
+    <tr>
+      <td>makespan</td>
+      <td>모든 에이전트 완료까지 총 경과 시간</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>sum_of_costs</td>
+      <td>전체 에이전트 이동 비용 합</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>path_optimality</td>
+      <td>실제 비용 / 각 에이전트 개별 최적 비용 (%, 100% = 최적)</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>throughput</td>
+      <td>단위 시간 완료 반송 수</td>
+      <td>D 지표와 공유</td>
+    </tr>
+    <tr>
+      <td>flowtime</td>
+      <td>에이전트별 완료 시간의 합</td>
+      <td></td>
+    </tr>
+  </tbody>
+</table>
+<p class="tbl-note">
+  <sup>a</sup> MAPF 표준 지표 정의: Stern et al., 2019 [3].
+</p>
+</div>
+
+<hr class="tbl-divider">
+
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!--  표 5. avg_transfer_time 비교                        -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div class="tbl-section">
+<div class="tbl-caption">표 5. avg_transfer_time 비교 (단위: 초, 30-seed 평균 ± 표준편차)</div>
+<table>
+  <thead>
+    <tr>
+      <th>시나리오</th>
+      <th class="ctr">A*</th>
+      <th class="ctr">PPO-RL</th>
+      <th class="ctr">CACTUS</th>
+      <th class="ctr">CBS-TS</th>
+      <th class="ctr">KW (p)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>S1: 8 AGV / 100 tasks</td>
+      <td class="ctr best">27.48 ± 1.84</td>
+      <td class="ctr">29.51 ± 2.05</td>
+      <td class="ctr">27.75 ± 1.76</td>
+      <td class="ctr best">27.48 ± 1.84</td>
+      <td class="ctr">&lt;0.001***</td>
+    </tr>
+    <tr>
+      <td>S2: 16 AGV / 200 tasks</td>
+      <td class="ctr best">26.26 ± 1.24</td>
+      <td class="ctr">28.08 ± 1.40</td>
+      <td class="ctr">26.68 ± 1.20</td>
+      <td class="ctr best">26.26 ± 1.24</td>
+      <td class="ctr">&lt;0.001***</td>
+    </tr>
+    <tr>
+      <td>S3: 32 AGV / 350 tasks</td>
+      <td class="ctr best">26.45 ± 0.73</td>
+      <td class="ctr">28.04 ± 0.84</td>
+      <td class="ctr">26.76 ± 0.74</td>
+      <td class="ctr best">26.45 ± 0.73</td>
+      <td class="ctr">&lt;0.001***</td>
+    </tr>
+  </tbody>
+</table>
+<p class="tbl-note">
+  <b>Bold</b> = 시나리오 내 최솟값 (best). KW = Kruskal-Wallis H 검정 (비모수 분산분석 대체).
+  *** p &lt; 0.001.  A*와 CBS-TS는 온라인 단일 에이전트 모드에서 동일 경로를 산출하여 값이 일치함.
+</p>
+</div>
+
+<hr class="tbl-divider">
+
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!--  표 6. Wilcoxon signed-rank 사후 검정                -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div class="tbl-section">
+<div class="tbl-caption">표 6. Wilcoxon signed-rank 사후 검정 — avg_transfer_time (Holm-Bonferroni 보정)</div>
+<table>
+  <thead>
+    <tr>
+      <th rowspan="2" style="vertical-align:middle">비교 쌍</th>
+      <th colspan="2" class="ctr">S1 (8 AGV)</th>
+      <th colspan="2" class="ctr">S2 (16 AGV)</th>
+      <th colspan="2" class="ctr">S3 (32 AGV)</th>
+    </tr>
+    <tr>
+      <th class="ctr">p<sub>adj</sub></th>
+      <th class="ctr">r</th>
+      <th class="ctr">p<sub>adj</sub></th>
+      <th class="ctr">r</th>
+      <th class="ctr">p<sub>adj</sub></th>
+      <th class="ctr">r</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>A* vs PPO</td>
+      <td class="ctr">&lt;0.001***</td><td class="ctr">0.798</td>
+      <td class="ctr">&lt;0.001***</td><td class="ctr">0.873</td>
+      <td class="ctr">&lt;0.001***</td><td class="ctr">0.873</td>
+    </tr>
+    <tr>
+      <td>A* vs CACTUS</td>
+      <td class="ctr">&lt;0.001***</td><td class="ctr">0.689</td>
+      <td class="ctr">0.003**</td><td class="ctr">0.606</td>
+      <td class="ctr">&lt;0.001***</td><td class="ctr">0.873</td>
+    </tr>
+    <tr>
+      <td>A* vs CBS-TS</td>
+      <td class="ctr">1.000 ns</td><td class="ctr">0.000</td>
+      <td class="ctr">1.000 ns</td><td class="ctr">0.000</td>
+      <td class="ctr">1.000 ns</td><td class="ctr">0.000</td>
+    </tr>
+    <tr>
+      <td>PPO vs CACTUS</td>
+      <td class="ctr">&lt;0.001***</td><td class="ctr">0.749</td>
+      <td class="ctr">&lt;0.001***</td><td class="ctr">0.794</td>
+      <td class="ctr">&lt;0.001***</td><td class="ctr">0.873</td>
+    </tr>
+    <tr>
+      <td>PPO vs CBS-TS</td>
+      <td class="ctr">&lt;0.001***</td><td class="ctr">0.798</td>
+      <td class="ctr">&lt;0.001***</td><td class="ctr">0.873</td>
+      <td class="ctr">&lt;0.001***</td><td class="ctr">0.873</td>
+    </tr>
+    <tr>
+      <td>CACTUS vs CBS-TS</td>
+      <td class="ctr">&lt;0.001***</td><td class="ctr">0.689</td>
+      <td class="ctr">0.003**</td><td class="ctr">0.606</td>
+      <td class="ctr">&lt;0.001***</td><td class="ctr">0.873</td>
+    </tr>
+  </tbody>
+</table>
+<p class="tbl-note">
+  유의수준: *** p &lt; 0.001, ** p &lt; 0.01, * p &lt; 0.05, ns p ≥ 0.05.
+  r = rank-biserial 상관계수 (효과 크기; r ≥ 0.5 = 대(large) 효과).
+  Holm-Bonferroni 다중 비교 보정 적용 (6쌍 × 3 시나리오 = 18회 검정).
+</p>
+</div>
+
+<hr class="tbl-divider">
+
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!--  표 7. 알고리즘 RTD 운영 적합성 요약                  -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div class="tbl-section">
+<div class="tbl-caption">표 7. 알고리즘 특성 및 RTD 온라인 운영 적합성 요약</div>
+<table>
+  <thead>
+    <tr>
+      <th>항목</th>
+      <th class="ctr">A*</th>
+      <th class="ctr">CBS-TS</th>
+      <th class="ctr">CACTUS</th>
+      <th class="ctr">PPO</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>운영 모드</td>
+      <td class="ctr">온라인</td>
+      <td class="ctr">오프라인 (배치)</td>
+      <td class="ctr">온라인 (분산)</td>
+      <td class="ctr">온라인</td>
+    </tr>
+    <tr>
+      <td>계획 방식</td>
+      <td>단일 에이전트</td>
+      <td>다중 에이전트 (CBS)</td>
+      <td>다중 에이전트 (QMIX CTDE)</td>
+      <td>단일 에이전트</td>
+    </tr>
+    <tr>
+      <td>계산 복잡도</td>
+      <td class="ctr">O(E log V)</td>
+      <td class="ctr">NP-hard</td>
+      <td class="ctr">O(1) 추론</td>
+      <td class="ctr">O(1) 추론</td>
+    </tr>
+    <tr>
+      <td>실측 성능 순위 <sup>a</sup></td>
+      <td class="ctr best">1위</td>
+      <td class="ctr best">1위 (= A*)</td>
+      <td class="ctr">3위</td>
+      <td class="ctr">4위</td>
+    </tr>
+    <tr>
+      <td>RTD 온라인 적합성</td>
+      <td class="ctr">✔ 높음</td>
+      <td class="ctr">△ 온라인 degradation</td>
+      <td class="ctr">○ 수렴 후 기대</td>
+      <td class="ctr">△ 협력 제한</td>
+    </tr>
+  </tbody>
+</table>
+<p class="tbl-note">
+  <sup>a</sup> avg_transfer_time 기준, 88노드 실 공장 레이아웃, 30 seed × 3 시나리오 실측 결과.
+  CBS-TS는 온라인 단일 에이전트 모드에서 A*와 동일한 경로를 산출 (Wilcoxon p=1.0, ns).
+  CACTUS는 2차 학습 부분 수렴(μ=−427) 상태로 A* Fallback 빈발. ✔ 높음 / △ 제한 / ○ 조건부.
+</p>
+</div>
+
+<hr class="tbl-divider">
+
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!--  표 8. 보조 지표 비교                                 -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div class="tbl-section">
+<div class="tbl-caption">표 8. 보조 지표 비교 — makespan, AMR 가동률, throughput, 경로 최적성 (30-seed 평균 ± 표준편차)</div>
+<table>
+  <thead>
+    <tr>
+      <th>시나리오</th>
+      <th>알고리즘</th>
+      <th class="ctr">makespan (s)</th>
+      <th class="ctr">AMR 가동률 (%)</th>
+      <th class="ctr">throughput<br>(/100s)</th>
+      <th class="ctr">경로 최적성 (%)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <!-- S1 -->
+    <tr>
+      <td rowspan="4"><b>S1</b><br>8 AGV<br>100 tasks</td>
+      <td>A*</td>
+      <td class="ctr best">297.3 ± 2.3</td>
+      <td class="ctr">88.1 ± 5.1</td>
+      <td class="ctr best">0.255 ± 0.019</td>
+      <td class="ctr best">100.0</td>
+    </tr>
+    <tr>
+      <td>PPO-RL</td>
+      <td class="ctr">296.1 ± 3.4</td>
+      <td class="ctr">88.8 ± 3.5</td>
+      <td class="ctr">0.238 ± 0.016</td>
+      <td class="ctr">94.1 ± 1.6</td>
+    </tr>
+    <tr>
+      <td>CACTUS</td>
+      <td class="ctr">296.7 ± 2.4</td>
+      <td class="ctr">88.3 ± 4.7</td>
+      <td class="ctr">0.253 ± 0.018</td>
+      <td class="ctr">98.7 ± 0.7</td>
+    </tr>
+    <tr>
+      <td>CBS-TS</td>
+      <td class="ctr best">297.3 ± 2.3</td>
+      <td class="ctr">88.1 ± 5.1</td>
+      <td class="ctr best">0.255 ± 0.019</td>
+      <td class="ctr best">100.0</td>
+    </tr>
+    <!-- S2 -->
+    <tr class="group-sep">
+      <td rowspan="4"><b>S2</b><br>16 AGV<br>200 tasks</td>
+      <td>A*</td>
+      <td class="ctr best">298.6 ± 1.2</td>
+      <td class="ctr">88.7 ± 3.2</td>
+      <td class="ctr best">0.539 ± 0.032</td>
+      <td class="ctr best">100.0</td>
+    </tr>
+    <tr>
+      <td>PPO-RL</td>
+      <td class="ctr">297.8 ± 1.9</td>
+      <td class="ctr">89.0 ± 2.7</td>
+      <td class="ctr">0.504 ± 0.031</td>
+      <td class="ctr">94.2 ± 0.9</td>
+    </tr>
+    <tr>
+      <td>CACTUS</td>
+      <td class="ctr">298.6 ± 1.2</td>
+      <td class="ctr">89.0 ± 2.8</td>
+      <td class="ctr">0.532 ± 0.030</td>
+      <td class="ctr">98.7 ± 0.6</td>
+    </tr>
+    <tr>
+      <td>CBS-TS</td>
+      <td class="ctr best">298.6 ± 1.2</td>
+      <td class="ctr">88.7 ± 3.2</td>
+      <td class="ctr best">0.539 ± 0.032</td>
+      <td class="ctr best">100.0</td>
+    </tr>
+    <!-- S3 -->
+    <tr class="group-sep">
+      <td rowspan="4"><b>S3</b><br>32 AGV<br>350 tasks</td>
+      <td>A*</td>
+      <td class="ctr best">597.3 ± 2.4</td>
+      <td class="ctr">46.1 ± 2.1</td>
+      <td class="ctr best">0.555 ± 0.021</td>
+      <td class="ctr best">100.0</td>
+    </tr>
+    <tr>
+      <td>PPO-RL</td>
+      <td class="ctr">597.7 ± 2.0</td>
+      <td class="ctr">48.7 ± 2.1</td>
+      <td class="ctr">0.553 ± 0.021</td>
+      <td class="ctr">94.2 ± 0.7</td>
+    </tr>
+    <tr>
+      <td>CACTUS</td>
+      <td class="ctr">597.4 ± 2.4</td>
+      <td class="ctr">46.6 ± 2.2</td>
+      <td class="ctr">0.554 ± 0.021</td>
+      <td class="ctr">98.7 ± 0.4</td>
+    </tr>
+    <tr>
+      <td>CBS-TS</td>
+      <td class="ctr best">597.3 ± 2.4</td>
+      <td class="ctr">46.1 ± 2.1</td>
+      <td class="ctr best">0.555 ± 0.021</td>
+      <td class="ctr best">100.0</td>
+    </tr>
+  </tbody>
+</table>
+<p class="tbl-note">
+  <b>Bold</b> = 해당 시나리오·지표 내 최솟값 또는 최댓값 (best). AMR 가동률 = 전체 시뮬레이션 시간 대비 이동 시간 비율.
+  경로 최적성 100% = 개별 최적 경로와 동일한 비용. S3에서 A* 가동률(46.1%)이 S1·S2(88%)보다 낮은 것은
+  32대 AGV 운영 시 대기 시간 비율 증가를 반영함.
+</p>
+</div>
+
+</body>
+</html>
