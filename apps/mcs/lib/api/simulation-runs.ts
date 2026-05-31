@@ -19,6 +19,31 @@ function toEntity(row: Record<string, unknown>): SimulationRun {
   };
 }
 
+/** 단건 조회 (layoutId 추출용 — 결과 페이지 ReplayCanvas) */
+export function useSimulationRun(runId: string | null) {
+  return useQuery({
+    queryKey: [QUERY_KEY, runId],
+    queryFn: async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('mcs_simulation_run')
+        .select('id, layout_id, scenario_params, algorithms, status')
+        .eq('id', runId!)
+        .single();
+      if (error) throw error;
+      return {
+        id:             data.id as string,
+        layoutId:       data.layout_id as string,
+        scenarioParams: data.scenario_params as SimulationRun['scenarioParams'],
+        algorithms:     data.algorithms as string,
+        status:         data.status as string,
+      };
+    },
+    enabled: !!runId,
+    staleTime: Infinity,
+  });
+}
+
 /** 최근 시뮬레이션 실행 이력 (최신순 10건) */
 export function useSimulationRuns() {
   return useQuery({

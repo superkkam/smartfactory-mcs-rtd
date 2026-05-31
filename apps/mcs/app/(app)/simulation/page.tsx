@@ -24,17 +24,27 @@ export default function SimulationPage() {
       return;
     }
     try {
+      const journalSeeds = formParams.journalMode
+        ? Array.from({ length: 25 }, (_, i) => i + 1)
+        : undefined;
+
       const res = await runSimulation({
         scenarioParams: {
           layoutId,
-          carrierCount:         formParams.carrierCount,
-          transferRequestCount: formParams.transferRequestCount,
-          simulationDuration:   formParams.simulationDuration,
+          carrierCount:       formParams.carrierCount,
+          utilizationRate:    formParams.utilizationRate,
+          simulationDuration: formParams.simulationDuration,
+          mode:               formParams.mode,
         },
         algorithms: formParams.algorithms,
+        seeds: journalSeeds,
       });
       setRunId(res.runId);
-      toast.success(`시뮬레이션 시작 (${res.runId.slice(0, 8)})`);
+      toast.success(
+        formParams.journalMode
+          ? `저널 실험 시작 — 25시드 × ${formParams.algorithms.length}알고리즘 (${res.runId.slice(0, 8)})`
+          : `시뮬레이션 시작 (${res.runId.slice(0, 8)})`,
+      );
     } catch (err) {
       toast.error(err instanceof Error ? err.message : '시뮬레이션 시작 실패');
     }

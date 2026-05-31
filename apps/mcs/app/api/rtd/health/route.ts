@@ -15,7 +15,7 @@ export async function GET() {
 
   const start = Date.now();
   try {
-    const res = await fetch(`${rtdUrl.replace(/\/$/, '')}/health`, {
+    const res = await fetch(`${rtdUrl.replace(/\/$/, '')}/api/health`, {
       signal: AbortSignal.timeout(3000),
     });
     const latencyMs = Date.now() - start;

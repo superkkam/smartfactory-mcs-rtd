@@ -134,7 +134,13 @@ export async function syncLayoutToDb(
   // RF id → 친숙 unit 코드 역매핑 (insert 후 unitIdToDbId 에 RF id 기준 항목도 추가하기 위해)
   const rfToUnitCode = new Map<string, string>();
 
-  const orphanPorts = portNodes.filter((n) => !nodeIdToDbId[(n.data as PortNodeData).parentEquipmentId]);
+  // parentEquipmentId → equipment DB uuid 해소: RF id 직접 매핑 우선, trim 후 재시도
+  function resolveEqpDbId(parentEquipmentId: string | undefined): string | undefined {
+    if (!parentEquipmentId) return undefined;
+    return nodeIdToDbId[parentEquipmentId] ?? nodeIdToDbId[parentEquipmentId.trim()];
+  }
+
+  const orphanPorts = portNodes.filter((n) => !resolveEqpDbId((n.data as PortNodeData).parentEquipmentId));
   if (orphanPorts.length > 0) {
     console.warn(
       `[syncLayoutToDb] parentEquipment 매핑 없는 orphan 포트 ${orphanPorts.length}개 제외:`,
@@ -143,14 +149,14 @@ export async function syncLayoutToDb(
   }
 
   const portUnitRows = portNodes
-    .filter((n) => !!nodeIdToDbId[(n.data as PortNodeData).parentEquipmentId])
+    .filter((n) => !!resolveEqpDbId((n.data as PortNodeData).parentEquipmentId))
     .map((n) => {
       const pData = n.data as PortNodeData;
       const unitCode = pData.portId?.trim() || n.id;  // PORT-001 등 친숙 코드
       rfToUnitCode.set(n.id, unitCode);
       return {
         equipment_unit_id: unitCode,
-        equipment_id:      nodeIdToDbId[pData.parentEquipmentId],
+        equipment_id:      resolveEqpDbId(pData.parentEquipmentId)!,
         unit_type:         'Port',
         in_out_mode:       pData.direction === 'IN'  ? 'In'
                          : pData.direction === 'OUT' ? 'Out'
@@ -238,21 +244,24 @@ export async function syncLayoutToDb(
   const transferEdges = edges.filter((e) => e.type === 'transfer');
 
   const droppedEdges: Edge[] = [];
-  const relationRows = transferEdges
-    .filter((e) => {
-      const ok = !!(unitIdToDbId[e.source] && unitIdToDbId[e.target]);
-      if (!ok) droppedEdges.push(e);
-      return ok;
-    })
-    .map((e) => {
-      const eData = e.data as TransferEdgeData | undefined;
-      return {
-        layout_id:         layoutId,
-        departure_unit_id: unitIdToDbId[e.source],
-        arrival_unit_id:   unitIdToDbId[e.target],
-        weight:            eData?.weight ?? 1.0,
-      };
-    });
+  const relationRows: Array<{ layout_id: string; departure_unit_id: string; arrival_unit_id: string; weight: number }> = [];
+
+  for (const e of transferEdges) {
+    const srcDbId = unitIdToDbId[e.source];
+    const tgtDbId = unitIdToDbId[e.target];
+    if (!srcDbId || !tgtDbId) {
+      droppedEdges.push(e);
+      continue;
+    }
+    const eData = e.data as TransferEdgeData | undefined;
+    const weight = eData?.weight ?? 1.0;
+    // source → target (항상 저장)
+    relationRows.push({ layout_id: layoutId, departure_unit_id: srcDbId, arrival_unit_id: tgtDbId, weight });
+    // markerStart 가 있으면 양방향 엣지 → target → source 도 저장 (IN 포트 도달 가능성 확보)
+    if (e.markerStart) {
+      relationRows.push({ layout_id: layoutId, departure_unit_id: tgtDbId, arrival_unit_id: srcDbId, weight });
+    }
+  }
 
   if (droppedEdges.length > 0) {
     console.warn(

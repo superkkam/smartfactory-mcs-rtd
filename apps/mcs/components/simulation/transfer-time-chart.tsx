@@ -16,7 +16,14 @@ interface TransferTimeChartProps {
   data: TransferTimeDistributionItem[];
 }
 
-/** 반송 시간 분포 히스토그램 (A* vs AI) */
+const ALG_LABEL: Record<string, string> = {
+  astar:  'A*',
+  ai_ppo: 'AI(PPO)',
+  cbs_ts: 'CBS-TS',
+  cactus: 'CACTUS',
+};
+
+/** 반송 시간 분포 히스토그램 (N-알고리즘) */
 export function TransferTimeChart({ data }: TransferTimeChartProps) {
   return (
     <div className="space-y-2">
@@ -33,17 +40,16 @@ export function TransferTimeChart({ data }: TransferTimeChartProps) {
           <YAxis tick={{ fontSize: 11 }} />
           <Tooltip
             contentStyle={{ fontSize: 12 }}
-            formatter={(value, name) =>
-              [`${value}건`, name === 'astar' ? 'A*' : 'AI']
-            }
+            formatter={(value, name) => [`${value}건`, ALG_LABEL[name as string] ?? name]}
           />
           <Legend
-            formatter={(value) => (value === 'astar' ? 'A*' : 'AI')}
+            formatter={(value) => ALG_LABEL[value] ?? value}
             iconSize={10}
             wrapperStyle={{ fontSize: 11 }}
           />
           <Bar dataKey="astar"  name="astar"  fill="#6366f1" radius={[3, 3, 0, 0]} />
           <Bar dataKey="ai_ppo" name="ai_ppo" fill="#10b981" radius={[3, 3, 0, 0]} />
+          <Bar dataKey="cbs_ts" name="cbs_ts" fill="#f59e0b" radius={[3, 3, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
     </div>

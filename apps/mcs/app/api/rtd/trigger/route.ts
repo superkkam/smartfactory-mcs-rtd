@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
   const result = await sendMessage(rtdUrl, loadRequest);
 
   return NextResponse.json(
-    { ok: result.ok, status: result.status, error: result.error },
+    { ok: result.ok, status: result.status, error: result.error, ack: result.data },
     { status: result.ok ? 200 : 502 },
   );
 }

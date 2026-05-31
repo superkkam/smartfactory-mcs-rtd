@@ -16,7 +16,14 @@ interface UtilizationChartProps {
   data: EquipmentUtilizationItem[];
 }
 
-/** 장비별 가동률 막대 그래프 (A* vs AI) */
+const ALG_LABEL: Record<string, string> = {
+  astar:  'A*',
+  ai_ppo: 'AI(PPO)',
+  cbs_ts: 'CBS-TS',
+  cactus: 'CACTUS',
+};
+
+/** 장비별 가동률 막대 그래프 (N-알고리즘) */
 export function UtilizationChart({ data }: UtilizationChartProps) {
   return (
     <div className="space-y-2">
@@ -33,17 +40,16 @@ export function UtilizationChart({ data }: UtilizationChartProps) {
           <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} unit="%" />
           <Tooltip
             contentStyle={{ fontSize: 12 }}
-            formatter={(value, name) =>
-              [`${value}%`, name === 'astar' ? 'A*' : 'AI']
-            }
+            formatter={(value, name) => [`${value}%`, ALG_LABEL[name as string] ?? name]}
           />
           <Legend
-            formatter={(value) => (value === 'astar' ? 'A*' : 'AI')}
+            formatter={(value) => ALG_LABEL[value] ?? value}
             iconSize={10}
             wrapperStyle={{ fontSize: 11 }}
           />
           <Bar dataKey="astar"  name="astar"  fill="#6366f1" radius={[3, 3, 0, 0]} />
           <Bar dataKey="ai_ppo" name="ai_ppo" fill="#10b981" radius={[3, 3, 0, 0]} />
+          <Bar dataKey="cbs_ts" name="cbs_ts" fill="#f59e0b" radius={[3, 3, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
     </div>

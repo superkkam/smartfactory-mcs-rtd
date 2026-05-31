@@ -8,12 +8,15 @@ import { TransferTimeChart } from '@/components/simulation/transfer-time-chart';
 import { UtilizationChart }  from '@/components/simulation/utilization-chart';
 import { CsvExportButton }   from '@/components/simulation/csv-export-button';
 import { useSimulationResult } from '@/lib/api/ai-engine';
+import { useSimulationRun }    from '@/lib/api/simulation-runs';
+import { ReplayCanvas }        from '@/components/simulation/replay-canvas';
 
 function SimulationResultContent() {
   const params = useSearchParams();
   const runId  = params.get('runId');
 
   const { data, isLoading, error } = useSimulationResult(runId);
+  const { data: runMeta } = useSimulationRun(runId);
 
   /* 헤더 (CSV 버튼 포함) — data 유무에 따라 버튼 활성화 */
   const header = (
@@ -63,29 +66,60 @@ function SimulationResultContent() {
     <div className="space-y-6">
       {header}
 
-      {/* 개선율 요약 배지 */}
+      {/* 개선율 요약 배지 — 양수일 때만 emerald, 음수면 amber */}
       {comparison && (
         <div className="flex flex-wrap gap-2">
-          <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
-            반송 시간 {comparison.transferTimeReduction.toFixed(1)}% 단축
-          </span>
-          <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
-            가동률 {comparison.utilizationIncrease.toFixed(1)}% 향상
-          </span>
-          <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
-            교착 발생 {comparison.deadlockElimination.toFixed(0)}% 제거
-          </span>
-          <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
-            처리량 {comparison.throughputIncrease.toFixed(1)}% 증가
-          </span>
+          {[
+            { value: comparison.transferTimeReduction, label: (v: number) => `반송 시간 ${v.toFixed(1)}% 단축` },
+            { value: comparison.utilizationIncrease,   label: (v: number) => `가동률 ${v.toFixed(1)}% 향상` },
+            { value: comparison.deadlockElimination,   label: (v: number) => v === 0 ? '교착 발생 없음' : `교착 ${v.toFixed(0)}% 감소` },
+            { value: comparison.throughputIncrease,    label: (v: number) => `처리량 ${v.toFixed(1)}% 변화` },
+          ].map(({ value, label }) => {
+            const pos = value >= 0;
+            return (
+              <span
+                key={label(value)}
+                className={`rounded-full border px-3 py-1 text-xs font-medium ${
+                  pos
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                    : 'border-amber-200 bg-amber-50 text-amber-700'
+                }`}
+              >
+                {pos ? '' : '▼ '}{label(value)}
+              </span>
+            );
+          })}
         </div>
+      )}
+
+      {/* 알고리즘별 경로 재생 */}
+      {runMeta?.layoutId && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-semibold text-gray-800">알고리즘별 경로 재생</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ReplayCanvas
+              layoutId={runMeta.layoutId}
+              algorithms={results.map((r) => r.algorithm)}
+              results={results}
+            />
+          </CardContent>
+        </Card>
       )}
 
       {/* A* vs AI 비교 테이블 */}
       {comparison && (
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold text-gray-800">성과 지표 비교</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-semibold text-gray-800">성과 지표 비교</CardTitle>
+              {comparison.pairwisePvalues && (
+                <span className="text-[10px] text-violet-600 bg-violet-50 border border-violet-200 rounded px-2 py-0.5">
+                  * p&lt;0.05 &nbsp; ** p&lt;0.01 (Wilcoxon + Bonferroni)
+                </span>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             <ComparisonTable results={results} comparison={comparison} />

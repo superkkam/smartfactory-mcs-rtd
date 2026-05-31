@@ -81,3 +81,37 @@ export function useSimulationResult(runId: string | null) {
     staleTime: Infinity,
   });
 }
+
+// ── Playground ───────────────────────────────────────────────────────
+
+export type PlaygroundAlgorithm = 'astar' | 'ai_ppo' | 'cbs_ts' | 'prioritized';
+
+export interface PlaygroundRequest {
+  grid_size: number;
+  obstacles: [number, number][];
+  starts: [number, number][];
+  goals: [number, number][];
+  algorithm: PlaygroundAlgorithm;
+}
+
+export interface AgentPath {
+  agent_id: string;
+  path: [number, number][];
+}
+
+export interface PlaygroundResponse {
+  agent_paths: AgentPath[];
+  cost: number;
+  makespan: number;
+  conflict_count: number;
+  runtime_ms: number;
+  fallback: boolean;
+}
+
+/** 알고리즘 Playground 즉석 경로 계산 */
+export async function solvePlayground(req: PlaygroundRequest): Promise<PlaygroundResponse> {
+  return aiEngineFetch<PlaygroundResponse>('/api/playground/solve', {
+    method: 'POST',
+    body: JSON.stringify(req),
+  });
+}

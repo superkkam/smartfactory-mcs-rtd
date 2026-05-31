@@ -113,10 +113,12 @@ export interface RuleClass {
 export interface RuleRunningResult {
   /** 자동 생성 고유 키 */
   uuid: string;
-  /** 처리 대상 Lot ID */
+  /** 처리 대상 Lot ID (= 선택된 캐리어/Lot) */
   lotId: string;
   /** 실행된 룰 ID → RuleDef */
   ruleId: string;
+  /** 룰 이름 (rule_def.rule_name 비정규화) */
+  ruleName?: string | null;
   /** 실행 시퀀스 번호 */
   sequence: number;
   /** 결과 건수 */
@@ -127,6 +129,10 @@ export interface RuleRunningResult {
   endTime: string;
   /** 디스패칭 적용 여부: Y | N */
   isDispatching: string;
+  /** 목적지 설비 ID (is_dispatching='Y' 인 row에만 존재) */
+  destEquipmentId?: string | null;
+  /** 시퀀스 실행 결과 rows (최대 20건, 분석용) */
+  resultRows?: Record<string, unknown>[] | null;
 }
 
 // ─── 시뮬레이터 타입 ────────────────────────────────────────────
@@ -173,4 +179,10 @@ export interface SimulationResponse {
   results: SimulationSequenceResult[];
   /** 전체 서버 처리 소요시간(ms) */
   totalDuration: number;
+  /** 최종 선택된 캐리어/Lot ID (finalRows[0].lot_id 또는 carrier_id) */
+  selectedLotId?: string | null;
+  /** 목적지 설비 ID (finalRows[0].equipment_id 또는 dest_equipment_id) */
+  destEquipmentId?: string | null;
+  /** 디스패칭 결과 row (finalRows[0] 전체 — 상세 표시용) */
+  dispatchRow?: Record<string, unknown> | null;
 }

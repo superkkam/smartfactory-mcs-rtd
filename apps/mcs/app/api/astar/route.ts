@@ -7,6 +7,8 @@ export interface AstarRequest {
   layoutId:     string;
   sourceUnitId: string;
   destUnitId:   string;
+  /** 런타임 장애물 유닛 ID 목록 — 시뮬레이션/RTD에서 랜덤 주입 */
+  blockedNodes?: string[];
 }
 
 /**
@@ -18,7 +20,7 @@ export interface AstarRequest {
 export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as AstarRequest;
-    const { layoutId, sourceUnitId, destUnitId } = body;
+    const { layoutId, sourceUnitId, destUnitId, blockedNodes } = body;
 
     if (!layoutId || !sourceUnitId || !destUnitId) {
       return NextResponse.json(
@@ -30,8 +32,11 @@ export async function POST(req: NextRequest) {
     // 그래프 로드
     const graph = await loadGraph(layoutId);
 
-    // A* 탐색
-    const result = runAstar(graph, sourceUnitId, destUnitId);
+    // 런타임 장애물 Set 구성
+    const blocked = new Set<string>(blockedNodes ?? []);
+
+    // A* 탐색 (장애물 우회 포함)
+    const result = runAstar(graph, sourceUnitId, destUnitId, blocked);
 
     // 경로의 유닛 라벨 리스트 구성 (DB uuid → 표시 ID)
     const pathWithLabels = result.path.map((step) => {
@@ -63,6 +68,7 @@ export async function POST(req: NextRequest) {
       path:          pathWithLabels,
       totalCost:     result.totalCost,
       exploredCount: result.exploredCount,
+      blockedNodes:  [...blocked],
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : '경로 탐색 실패';

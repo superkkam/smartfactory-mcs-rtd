@@ -45,47 +45,51 @@ export async function POST(request: NextRequest) {
       const created: string[] = [];
 
       for (const lot of body.lots) {
-        // ─── 1. 캐리어 조회 ─────────────────────────────────────
+        // ─── 1. 캐리어 조회 (location_id 포함) ─────────────────────
         let carrierId = lot.carrierId ?? null;
+        let carrierLocationId: string | null = null;
         if (!carrierId && lot.lotId) {
           const { data: carrier } = await supabase
             .from('mcs_carrier')
-            .select('id')
+            .select('id, location_id')
             .eq('lot_id', lot.lotId)
             .maybeSingle();
           carrierId = carrier?.id ?? null;
+          carrierLocationId = carrier?.location_id ?? null;
+        } else if (lot.carrierId) {
+          const { data: carrier } = await supabase
+            .from('mcs_carrier')
+            .select('location_id')
+            .eq('id', lot.carrierId)
+            .maybeSingle();
+          carrierLocationId = carrier?.location_id ?? null;
         }
 
-        // ─── 2. 출발 장비 → 레이아웃 ID 조회 ──────────────────────
-        const { data: srcEq } = await supabase
-          .from('mcs_equipment')
-          .select('id, layout_id')
-          .eq('equipment_id', lot.sourceEquipmentId)
-          .maybeSingle();
-
+        // ─── 2. 목적지 장비 → 레이아웃 ID 조회 ──────────────────────
         const { data: dstEq } = await supabase
           .from('mcs_equipment')
-          .select('id')
+          .select('id, layout_id')
           .eq('equipment_id', lot.destEquipmentId)
           .maybeSingle();
 
-        if (!srcEq?.layout_id || !dstEq?.id) {
+        if (!dstEq?.layout_id) {
           console.warn(
-            `[MCS] DISPATCH_RESULT 장비 조회 실패 | src=${lot.sourceEquipmentId} dst=${lot.destEquipmentId}`,
+            `[MCS] DISPATCH_RESULT 목적지 장비 조회 실패 | dst=${lot.destEquipmentId}`,
           );
           continue;
         }
 
-        const layoutId = srcEq.layout_id as string;
+        const layoutId = dstEq.layout_id as string;
 
         // ─── 3. 출발/목적 유닛 DB UUID 조회 ───────────────────────
-        // lot.sourceUnitId / destUnitId 는 선택적 — 없으면 장비의 OUT/IN 포트 자동 선정
+        // 출발: 우선순위 1) RTD sourceUnitId  2) 캐리어 실제 위치  3) 장비 OUT 포트
         let srcUnitDbId: string | null = null;
         let srcUnitLabel: string | null = null;
         let dstUnitDbId: string | null = null;
         let dstUnitLabel: string | null = null;
 
         if (lot.sourceUnitId) {
+          // RTD가 명시적으로 전달한 유닛 UUID (또는 label)
           const { data: u } = await supabase
             .from('mcs_equipment_unit')
             .select('id, equipment_unit_id')
@@ -95,17 +99,36 @@ export async function POST(request: NextRequest) {
           srcUnitLabel = u?.equipment_unit_id ?? null;
         }
 
-        if (!srcUnitDbId) {
-          // OUT 또는 BOTH 모드 포트 중 첫 번째 선택
+        if (!srcUnitDbId && carrierLocationId) {
+          // 캐리어의 실제 location_id (UUID) 직접 사용
           const { data: u } = await supabase
             .from('mcs_equipment_unit')
             .select('id, equipment_unit_id')
-            .eq('equipment_id', srcEq.id)
-            .in('in_out_mode', ['Out', 'Both'])
-            .limit(1)
+            .eq('id', carrierLocationId)
             .maybeSingle();
           srcUnitDbId = u?.id ?? null;
           srcUnitLabel = u?.equipment_unit_id ?? null;
+        }
+
+        if (!srcUnitDbId && lot.sourceEquipmentId) {
+          // fallback: lot.sourceEquipmentId 장비의 OUT 포트
+          const { data: srcEq } = await supabase
+            .from('mcs_equipment')
+            .select('id')
+            .eq('equipment_id', lot.sourceEquipmentId)
+            .maybeSingle();
+          if (srcEq) {
+            const { data: u } = await supabase
+              .from('mcs_equipment_unit')
+              .select('id, equipment_unit_id')
+              .eq('equipment_id', srcEq.id)
+              .in('in_out_mode', ['Out', 'Both'])
+              .order('equipment_unit_id')
+              .limit(1)
+              .maybeSingle();
+            srcUnitDbId = u?.id ?? null;
+            srcUnitLabel = u?.equipment_unit_id ?? null;
+          }
         }
 
         if (lot.destUnitId) {
@@ -119,12 +142,13 @@ export async function POST(request: NextRequest) {
         }
 
         if (!dstUnitDbId) {
-          // IN 또는 BOTH 모드 포트 중 첫 번째 선택
+          // IN 또는 BOTH 모드 포트 중 첫 번째 선택 (ORDER BY로 결정적 순서 보장)
           const { data: u } = await supabase
             .from('mcs_equipment_unit')
             .select('id, equipment_unit_id')
             .eq('equipment_id', dstEq.id)
             .in('in_out_mode', ['In', 'Both'])
+            .order('equipment_unit_id')
             .limit(1)
             .maybeSingle();
           dstUnitDbId = u?.id ?? null;
@@ -138,21 +162,67 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        // ─── 4. A* 경로 탐색 ────────────────────────────────────
+        // A5 진단: 최종 채택된 src 확인 (lot.sourceUnitId vs carrierLoc 중 어느 것이 쓰였는지)
+        console.log(
+          `[MCS] DISPATCH src 결정 | lot.sourceUnitId=${lot.sourceUnitId ?? 'null'} carrierLoc=${carrierLocationId?.slice(0, 8) ?? 'null'} → srcUnitDbId=${srcUnitDbId.slice(0, 8)} dstUnitDbId=${dstUnitDbId.slice(0, 8)}`,
+        );
+
+        // B1: 같은 carrier 에 대한 active macro 가 이미 있으면 중복 dispatch 거부
+        if (carrierId) {
+          const { data: activeMacro } = await supabase
+            .from('mcs_macro_command')
+            .select('id, command_id')
+            .eq('carrier_id', carrierId)
+            .in('state', ['Pending', 'InProgress'])
+            .maybeSingle();
+          if (activeMacro) {
+            console.warn(
+              `[MCS] DISPATCH 거부: 같은 carrier 의 active macro 존재 | carrier=${carrierId.slice(0, 8)} active=${(activeMacro as Record<string, unknown>).command_id}`,
+            );
+            continue;
+          }
+        }
+
+        // ─── 4. 그래프 로드 + 장애물 집합 구성 ──────────────────────────
+        // MCS_INJECT_RANDOM_OBSTACLES=true 일 때만 랜덤 장애물 삽입 (기본: 비활성)
+        const graph = await loadGraph(layoutId);
+        const blockedSet = new Set<string>();
+
+        if (process.env.MCS_INJECT_RANDOM_OBSTACLES === 'true') {
+          try {
+            const candidates = [...graph.keys()].filter(
+              (id) => id !== srcUnitDbId && id !== dstUnitDbId,
+            );
+            for (let i = candidates.length - 1; i > 0; i--) {
+              const j = Math.floor(Math.random() * (i + 1));
+              [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+            }
+            candidates.slice(0, 5).forEach((id) => blockedSet.add(id));
+            if (blockedSet.size > 0) {
+              console.log(`[MCS] 랜덤 장애물 ${blockedSet.size}개 주입:`, [...blockedSet]);
+            }
+          } catch {
+            // 장애물 생성 실패 시 무시하고 장애물 없이 탐색
+          }
+        }
+
+        // ─── 5. A* 경로 탐색 (장애물 우회 포함) ────────────────────
         let astarPath: Array<{ unitId: string }>;
         let astarCost: number;
 
         try {
-          const graph = await loadGraph(layoutId);
-          const astarResult = runAstar(graph, srcUnitDbId, dstUnitDbId);
+          const astarResult = runAstar(graph, srcUnitDbId, dstUnitDbId, blockedSet);
           astarPath = astarResult.path;
           astarCost = astarResult.totalCost;
         } catch (e) {
-          console.error('[MCS] A* 경로 탐색 실패', e instanceof Error ? e.message : e);
+          console.error(
+            `[MCS] A* 경로 탐색 실패 | src=${srcUnitLabel}(${srcUnitDbId}) dst=${dstUnitLabel}(${dstUnitDbId}) |`,
+            e instanceof Error ? e.message : e,
+          );
           continue;
         }
 
-        // ─── 5. AI 경로 추론 + 하이브리드 선택 ──────────────────────
+        // ─── 6. AI 경로 추론 + 하이브리드 선택 ──────────────────────
         let algorithm = 'ASTAR';
 
         try {
@@ -173,7 +243,7 @@ export async function POST(request: NextRequest) {
           // FastAPI 미기동 또는 오류 → A* 폴백
         }
 
-        // ─── 6. MacroCommand 생성 ────────────────────────────────
+        // ─── 7. MacroCommand 생성 ────────────────────────────────
         const commandId = `CMD-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 
         const { data: cmd, error: cmdErr } = await supabase
@@ -200,7 +270,7 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        // ─── 7. MicroCommand 분해 + bulk insert ──────────────────
+        // ─── 8. MicroCommand 분해 + bulk insert ──────────────────
         if (astarPath.length >= 2) {
           const micros = astarPath.slice(0, -1).map((step, idx) => ({
             macro_command_id:  cmd.id,

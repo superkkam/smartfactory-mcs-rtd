@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/server';
 import { syncLayoutToDb } from '@/lib/api/sync-layout-to-db';
 import type { Node, Edge } from '@xyflow/react';
 
@@ -8,6 +8,7 @@ import type { Node, Edge } from '@xyflow/react';
  *
  * 저장된 레이아웃 JSON으로 구조화 테이블(mcs_equipment/unit/transfer_relation) 재동기화.
  * AI 추론 오류 "전이 관계가 없습니다" 해결 용도.
+ * RLS 우회 필요 → createAdminClient() 사용.
  *
  * Body: { layoutId: string }
  */
@@ -18,7 +19,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'layoutId 필수' }, { status: 400 });
     }
 
-    const supabase = await createClient();
+    // service_role 클라이언트 — DELETE/INSERT에 RLS 미적용
+    const supabase = createAdminClient();
 
     // 레이아웃 JSON 조회
     const { data: layout, error: layoutErr } = await supabase
@@ -35,7 +37,8 @@ export async function POST(req: NextRequest) {
     const nodes = json.nodes ?? [];
     const edges = json.edges ?? [];
 
-    await syncLayoutToDb(layoutId, nodes, edges);
+    // supabase 인스턴스를 명시적으로 전달해 syncLayoutToDb 내부에서 anon client 생성 방지
+    await syncLayoutToDb(layoutId, nodes, edges, supabase);
 
     return NextResponse.json({ ok: true, message: `레이아웃(${layoutId}) 재동기화 완료` });
   } catch (err: unknown) {

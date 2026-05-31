@@ -214,10 +214,17 @@ export interface SimulationScenarioParams {
   layoutId: string;
   /** 가상 캐리어 수 */
   carrierCount: number;
-  /** 반송 요청 총 건수 */
-  transferRequestCount: number;
+  /**
+   * 부하율 ρ (0~1). 지정 시 transferRequestCount 자동 계산.
+   * transferRequestCount = round(ρ × carrierCount × simulationDuration / avg_travel_time)
+   */
+  utilizationRate?: number;
+  /** 반송 요청 총 건수 (utilizationRate 미지정 시 직접 설정) */
+  transferRequestCount?: number;
   /** 시뮬레이션 시간 (초) */
   simulationDuration: number;
+  /** 시뮬레이션 모드: online(순차 도착) | batch(MAPF 표준, CBS-TS 권장) */
+  mode?: 'online' | 'batch';
 }
 
 /** 시뮬레이션 실행 */
@@ -230,26 +237,67 @@ export interface SimulationRun extends McsBaseEntity {
   status: string;
 }
 
-/** 시뮬레이션 성과 지표 */
+/** 시뮬레이션 중 실제로 발생한 충돌 이벤트 */
+export interface ConflictEvent {
+  carrierId: string;
+  nodeId: string;
+  time: number;
+}
+
+/** 캐리어 1건의 이동 경로 (시뮬레이션 결과 재생 뷰용) */
+export interface AgentTrace {
+  agentId: string;
+  srcUnit: string;
+  dstUnit: string;
+  /** React Flow 노드 ID 시퀀스 */
+  path: string[];
+  startTime: number;
+  endTime: number;
+}
+
+/** 시뮬레이션 성과 지표 (MAPF 저널 표준 + 기존 호환 필드) */
 export interface SimulationResult extends McsBaseEntity {
-  /** 연관 시뮬레이션 → SimulationRun.id */
   simulationRunId: string;
-  /** 알고리즘 유형 */
   algorithm: string;
+  // ── MAPF 저널 표준 (Stern SoCS 2019) ──
+  /** Makespan: 첫 요청 ~ 마지막 완료 (초) */
+  makespan: number;
+  /** Sum of Costs: 개별 반송 시간 합 (초) */
+  sumOfCosts: number;
   /** 평균 반송 시간 (초) */
   avgTransferTime: number;
+  /** 평균 AMR 풀 대기 시간 (초) */
+  avgWaitTime: number;
+  /** AMR 가동률 (%) — busy_time / (N_amr × T_sim) */
+  amrUtilization: number;
   /** 단위 시간당 처리 건수 */
   throughput: number;
-  /** 충돌/대기 횟수 */
-  collisionCount: number;
-  /** 부하 균형 표준편차 */
-  loadBalanceStd: number;
-  /** 장비 가동률 (%) */
-  equipmentUtilization: number;
   /** 교착 발생 횟수 */
   deadlockCount: number;
-  /** 경로 효율 점수 (0~100) */
+  /** 교착 발생률 (건/분) */
+  deadlockRate: number;
+  /** 경로 최적성 (0~100, A* 대비 비율 평균) */
+  pathOptimality: number;
+  /** MAPF vertex/edge conflict 횟수 */
+  conflictCount: number;
+  // ── 기존 호환 필드 ──
+  collisionCount: number;
+  loadBalanceStd: number;
+  equipmentUtilization: number;
   routeEfficiencyScore: number;
+  // ── 다중 시드 통계 ──
+  makespanStd?: number;
+  makespanCiLow?: number;
+  makespanCiHigh?: number;
+  avgTransferTimeStd?: number;
+  avgTransferTimeCiLow?: number;
+  avgTransferTimeCiHigh?: number;
+  seedCount?: number;
+  fallback?: boolean;
+  /** 재생 뷰용 캐리어 경로 (시드 대표 1회분, 최대 100건) */
+  agentTraces?: AgentTrace[];
+  /** 시뮬레이션 중 실제로 발생한 충돌 이벤트 목록 */
+  conflictEvents?: ConflictEvent[];
 }
 
 // ─── React Flow 커스텀 노드/엣지 타입 ────────────────────────────
@@ -322,7 +370,9 @@ export interface InferenceResponse {
 export interface SimulationRunRequest {
   scenarioParams: SimulationScenarioParams;
   /** 실행할 알고리즘 목록 */
-  algorithms: Array<'astar' | 'ai_ppo'>;
+  algorithms: Array<'astar' | 'ai_ppo' | 'cbs_ts' | 'cactus'>;
+  /** 다중 시드 (25시드 저널 실험 시 [1..25] 지정, 미지정 시 단일 랜덤 실행) */
+  seeds?: number[];
 }
 
 /** 시뮬레이션 실행 API 응답 */
@@ -338,6 +388,15 @@ export interface SimulationStatusResponse {
   progress: number;
 }
 
+/** 메트릭별 알고리즘 쌍 Wilcoxon p-value (Bonferroni 보정) */
+export interface PairwisePvalues {
+  /** makespan p-value: { "astar__vs__cbs_ts": 0.001, ... } */
+  makespan?: Record<string, number>;
+  sumOfCosts?: Record<string, number>;
+  avgTransferTime?: Record<string, number>;
+  pathOptimality?: Record<string, number>;
+}
+
 /** A* vs AI 비교 요약 지표 */
 export interface SimulationComparison {
   transferTimeReduction: number;
@@ -345,6 +404,8 @@ export interface SimulationComparison {
   deadlockElimination: number;
   efficiencyIncrease: number;
   throughputIncrease: number;
+  /** 25시드 Wilcoxon 검정 결과 (다중 시드 실행 시만 존재) */
+  pairwisePvalues?: PairwisePvalues;
 }
 
 /** 반송 시간 분포 히스토그램 항목 */
@@ -352,6 +413,8 @@ export interface TransferTimeDistributionItem {
   range: string;
   astar: number;
   ai_ppo: number;
+  cbs_ts?: number;
+  cactus?: number;
 }
 
 /** 장비별 가동률 분포 항목 */
@@ -359,6 +422,8 @@ export interface EquipmentUtilizationItem {
   equipment: string;
   astar: number;
   ai_ppo: number;
+  cbs_ts?: number;
+  cactus?: number;
 }
 
 /** 시뮬레이션 결과 전체 응답 */
