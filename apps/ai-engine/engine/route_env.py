@@ -41,7 +41,7 @@ class McsRouteEnv(gym.Env):
         """
         Args:
             graph: NetworkX DiGraph (노드 ID = DB uuid)
-            source_id: 출발 유닛 uuid
+            source_id: 출발 유닛 uuid (reset() 호출마다 랜덤 교체 가능)
             dest_id: 목적 유닛 uuid
             dynamic_weights: {unit_uuid: congestion_factor (0~1)} 혼잡도 맵
         """
@@ -56,6 +56,20 @@ class McsRouteEnv(gym.Env):
         self.node_list: List[str] = list(graph.nodes())
         self.n_nodes = len(self.node_list)
         self.uuid_to_idx: Dict[str, int] = {uid: i for i, uid in enumerate(self.node_list)}
+
+        # BFS 거리 사전 계산 (보상 쉐이핑용)
+        import networkx as nx_local
+        self._bfs_dist: Dict[str, Dict[str, int]] = {}
+        for node in self.node_list:
+            lengths = nx_local.single_source_shortest_path_length(graph, node)
+            self._bfs_dist[node] = dict(lengths)
+
+        # 일반화 학습: reset() 마다 src/dst 랜덤 교체 여부
+        self._random_reset: bool = False
+        # BFS 거리 기반 보상 쉐이핑 활성화 여부 (학습 가속)
+        self._reward_shaping: bool = False
+        # random_reset 시 사용할 노드 풀 (기본: 전체 노드, Port 전용 학습 시 Port 목록)
+        self._train_nodes: Optional[List[str]] = None
 
         # Gymnasium 공간 정의
         obs_size = 4 * MAX_NODES
@@ -93,6 +107,16 @@ class McsRouteEnv(gym.Env):
             self.uuid_to_idx = {uid: i for i, uid in enumerate(self.node_list)}
             self._max_steps = 2 * self.n_nodes
 
+        # 일반화 학습: 에피소드마다 새 src/dst 랜덤 샘플
+        if self._random_reset and source_id is None and dest_id is None:
+            import random
+            pool = self._train_nodes if self._train_nodes else self.node_list
+            candidates = [n for n in pool if len(list(self.graph.successors(n))) > 0]
+            if len(candidates) >= 2:
+                src_new, dst_new = random.sample(candidates, 2)
+                self.source_id = src_new
+                self.dest_id   = dst_new
+
         if source_id is not None:
             self.source_id = source_id
         if dest_id is not None:
@@ -129,12 +153,16 @@ class McsRouteEnv(gym.Env):
         edge_weight = self.graph[self._current_id][next_id].get("weight", 1.0)
         congestion = self.dynamic_weights.get(next_id, 0.0)
 
+        # BFS 거리 기반 보상 쉐이핑 계산 (이동 전 거리)
+        prev_dist = self._bfs_dist.get(self._current_id, {}).get(self.dest_id, self.n_nodes)
+
         # 보상 계산
         if next_id == self.dest_id:
             reward = 100.0
             terminated = True
         elif next_id in self._visited:
-            reward = -50.0  # 재방문 패널티
+            # 보상 쉐이핑 활성 시 재방문 패널티 완화 (shaping이 이미 방향 유도)
+            reward = -5.0 if self._reward_shaping else -50.0
             terminated = False
         else:
             reward = -edge_weight * (1.0 + congestion)
@@ -143,6 +171,11 @@ class McsRouteEnv(gym.Env):
         step_cost = edge_weight
         self._current_id = next_id
         self._visited.add(next_id)
+
+        # 보상 쉐이핑: 목표에 가까워지면 +bonus, 멀어지면 -penalty
+        if self._reward_shaping and not terminated:
+            new_dist = self._bfs_dist.get(self._current_id, {}).get(self.dest_id, self.n_nodes)
+            reward += float(prev_dist - new_dist) * 2.0  # 접근 +2, 후퇴 -2
 
         truncated = (not terminated) and (self._step_count >= self._max_steps)
         if truncated:

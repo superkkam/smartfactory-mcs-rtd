@@ -47,17 +47,12 @@ class PpoAgent:
 
         try:
             from stable_baselines3 import PPO
-            from engine.route_env import McsRouteEnv
-            import networkx as nx
 
-            # 더미 그래프로 환경 생성 (모델 로딩용)
-            dummy_graph = nx.DiGraph()
-            dummy_graph.add_edge("a", "b", weight=1.0)
-            dummy_env = McsRouteEnv(dummy_graph, "a", "b")
-
-            self.model = PPO.load(model_path, env=dummy_env)
+            # env=None으로 로딩 → 관측 차원 자동 감지 (compact 176차원 또는 full 400차원)
+            self.model = PPO.load(model_path, env=None)
+            self._obs_size = self.model.observation_space.shape[0]
             self.is_loaded = True
-            logger.info(f"PPO 모델 로딩 완료: {model_path}")
+            logger.info(f"PPO 모델 로딩 완료: {model_path} (관측 차원: {self._obs_size})")
             return True
         except Exception as e:
             logger.error(f"PPO 모델 로딩 실패: {e} → A* 폴백 모드")
@@ -75,48 +70,69 @@ class PpoAgent:
         """
         PPO 경로 추론 (모델 미존재 시 A* 폴백)
 
+        compact 모델(2*n_nodes 관측)과 full 모델(4*MAX_NODES 관측) 모두 지원.
+
         Returns:
             (path_uuids, total_cost, confidence)
-            - path_uuids: 유닛 uuid 리스트
-            - total_cost: 총 경로 비용
-            - confidence: 0~1 (폴백 시 0.0)
         """
         if not self.is_loaded or self.model is None:
             return self._astar_fallback(graph, source_id, dest_id, dynamic_weights)
 
         try:
-            from engine.route_env import McsRouteEnv
-            weights = dynamic_weights or {}
+            import numpy as np
+            node_list = sorted(graph.nodes())
+            n_nodes   = len(node_list)
+            node_idx  = {nd: i for i, nd in enumerate(node_list)}
+            obs_size  = getattr(self, "_obs_size", 400)
 
-            env = McsRouteEnv(graph, source_id, dest_id, weights)
-            obs, _ = env.reset()
+            def _make_obs(cur: str, dst: str) -> np.ndarray:
+                """compact (2*n) 또는 full (4*MAX) 관측 생성"""
+                if obs_size == 2 * n_nodes:
+                    obs = np.zeros(obs_size, dtype=np.float32)
+                    obs[node_idx.get(cur, 0)]           = 1.0
+                    obs[n_nodes + node_idx.get(dst, 0)] = 1.0
+                else:
+                    from engine.route_env import MAX_NODES
+                    obs = np.zeros(4 * MAX_NODES, dtype=np.float32)
+                    ci = node_idx.get(cur, -1)
+                    di = node_idx.get(dst, -1)
+                    if 0 <= ci < MAX_NODES:
+                        obs[ci] = 1.0
+                    if 0 <= di < MAX_NODES:
+                        obs[MAX_NODES + di] = 1.0
+                return obs
 
+            current    = source_id
             path_uuids = [source_id]
             total_cost = 0.0
-            max_steps = 2 * len(graph.nodes)
+            max_steps  = 3 * n_nodes
+            visited    = {source_id}
 
             for _ in range(max_steps):
+                obs       = _make_obs(current, dest_id)
                 action, _ = self.model.predict(obs, deterministic=True)
-                obs, _, terminated, truncated, info = env.step(int(action))
+                nbrs      = sorted(graph.successors(current))
 
-                current_node = info.get("current_node_uuid", "")
-                step_cost = info.get("step_cost", 0.0)
-
-                if current_node and current_node != path_uuids[-1]:
-                    path_uuids.append(current_node)
-                    total_cost += step_cost
-
-                if terminated:
-                    # 목적지 도달: 높은 신뢰도
-                    confidence = 0.85
-                    return path_uuids, total_cost, confidence
-
-                if truncated:
+                if not nbrs or int(action) >= len(nbrs):
                     break
 
-            # 목적지 미도달: 낮은 신뢰도로 현재 경로 반환
-            logger.warning(f"PPO 추론 최대 스텝 초과: {source_id} → {dest_id}")
-            return path_uuids, total_cost, 0.3
+                nxt = nbrs[int(action)]
+                edge_w = graph[current][nxt].get("weight", 1.0) if graph.has_edge(current, nxt) else 1.0
+                total_cost += edge_w
+                current = nxt
+
+                if current not in visited:
+                    path_uuids.append(current)
+                    visited.add(current)
+                elif path_uuids[-1] != current:
+                    path_uuids.append(current)
+
+                if current == dest_id:
+                    return path_uuids, total_cost, 0.85
+
+            # 목적지 미도달 → A* 폴백
+            logger.warning(f"PPO 추론 목적지 미도달: {source_id} → {dest_id}")
+            return self._astar_fallback(graph, source_id, dest_id, dynamic_weights)
 
         except Exception as e:
             logger.error(f"PPO 추론 오류: {e} → A* 폴백")

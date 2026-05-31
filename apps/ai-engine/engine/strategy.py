@@ -87,8 +87,8 @@ class PpoStrategy(RouteStrategy):
 
 class CactusStrategy(RouteStrategy):
     """
-    CACTUS: MARL-based MAPF (PPO + QMIX CTDE, Reverse Curriculum)
-    구현 예정 — Task 025
+    CACTUS: MARL-based MAPF (QMIX CTDE + Reverse Curriculum)
+    per-agent 분산 추론 (CTDE decentralized 부분). Task 025 구현.
     """
 
     def predict(
@@ -99,20 +99,27 @@ class CactusStrategy(RouteStrategy):
         unit_labels: dict[str, str],
         dynamic_weights: Optional[dict[str, float]] = None,
     ) -> tuple[list[str], float, float]:
-        raise NotImplementedError(
-            "CACTUS 알고리즘은 Task 025에서 구현 예정입니다. "
-            "현재 이 요청은 503으로 응답됩니다."
+        from engine.cactus.qmix_agent import qmix_agent
+        return qmix_agent.predict_single(
+            graph=graph,
+            source_id=source_id,
+            dest_id=dest_id,
+            unit_labels=unit_labels,
+            dynamic_weights=dynamic_weights,
         )
 
     @property
     def is_available(self) -> bool:
-        return False
+        from engine.cactus.qmix_agent import qmix_agent
+        return qmix_agent.is_loaded
 
 
 class CbsTsStrategy(RouteStrategy):
     """
-    CBS-TS: MILP+CBS High-level / MLA* Low-level, Search Forest
-    이종 AMR 호환 MAPF — Task 026
+    CBS-TS: MLA* 기반 단일 에이전트 경로 탐색 (RouteStrategy 호환)
+    다중 에이전트 충돌 해소(CBS)는 solve_multi_agent()를 통해 호출.
+
+    단일 호출 시 MLA* 단독 결과 반환 — 결정론적 → confidence=1.0
     """
 
     def predict(
@@ -123,14 +130,29 @@ class CbsTsStrategy(RouteStrategy):
         unit_labels: dict[str, str],
         dynamic_weights: Optional[dict[str, float]] = None,
     ) -> tuple[list[str], float, float]:
-        raise NotImplementedError(
-            "CBS-TS 알고리즘은 Task 026에서 구현 예정입니다. "
-            "현재 이 요청은 503으로 응답됩니다."
-        )
+        from engine.cbs_ts.mla_star import mla_star
+
+        # 출발 노드 속성에서 amr_type 추정 (없으면 TYPE_A 기본값)
+        amr_type = self._infer_amr_type(graph, source_id)
+
+        path, cost = mla_star(graph, source_id, dest_id, amr_type=amr_type)
+        return path, cost, 1.0  # 결정론적 → confidence=1.0
+
+    @staticmethod
+    def _infer_amr_type(graph: nx.DiGraph, node_id: str) -> str:
+        """그래프 노드 속성에서 amr_type 추정. 없으면 TYPE_A."""
+        if node_id in graph:
+            attrs = graph.nodes[node_id]
+            return attrs.get("amr_type", "TYPE_A")
+        return "TYPE_A"
 
     @property
     def is_available(self) -> bool:
-        return False
+        try:
+            import pulp  # noqa: F401
+            return True
+        except ImportError:
+            return False
 
 
 # ── Strategy Registry ──────────────────────────────────────────────
