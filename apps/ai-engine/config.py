@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     # PPO 모델 경로 (학습 후 생성됨, 없으면 A* 폴백)
     model_path: str = "trained_models/ppo_route.zip"
 
+    # CACTUS QMix 체크포인트 경로 (없으면 503)
+    cactus_model_path: str = "trained_models/cactus_qmix.pt"
+
     # CORS 허용 오리진 (JSON 배열 문자열 또는 콤마 구분)
     cors_origins: str = '["http://localhost:3000"]'
 

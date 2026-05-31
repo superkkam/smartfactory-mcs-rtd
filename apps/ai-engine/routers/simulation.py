@@ -6,8 +6,9 @@ GET  /api/simulation/result/{id} — 완료 후 결과 조회
 """
 import uuid
 import logging
-import statistics
+import numpy as np
 from datetime import datetime, timezone
+from typing import Optional
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from models.schemas import (
     SimulationRunRequest,
@@ -16,6 +17,7 @@ from models.schemas import (
     SimulationResultResponse,
     SimulationResultItem,
     SimulationComparison,
+    PairwisePvalues,
 )
 from services.simulation_store import simulation_store
 
@@ -28,16 +30,12 @@ async def start_simulation(
     req: SimulationRunRequest,
     background_tasks: BackgroundTasks,
 ) -> SimulationRunResponse:
-    """
-    시뮬레이션 시작 — 즉시 runId 반환 후 백그라운드 실행
-    """
     from services.supabase_client import get_supabase
 
     layout_id = req.scenarioParams.layoutId
     if not layout_id:
         raise HTTPException(status_code=400, detail="scenarioParams.layoutId 필수")
 
-    # DB에 시뮬레이션 실행 레코드 생성
     run_id = str(uuid.uuid4())
     try:
         supabase = get_supabase()
@@ -45,9 +43,11 @@ async def start_simulation(
             "id": run_id,
             "layout_id": layout_id,
             "scenario_params": {
-                "carrierCount": req.scenarioParams.carrierCount,
-                "transferRequestCount": req.scenarioParams.transferRequestCount,
-                "simulationDuration": req.scenarioParams.simulationDuration,
+                "carrierCount":          req.scenarioParams.carrierCount,
+                "utilizationRate":       req.scenarioParams.utilizationRate,
+                "transferRequestCount":  req.scenarioParams.transferRequestCount,
+                "simulationDuration":    req.scenarioParams.simulationDuration,
+                "mode":                  req.scenarioParams.mode,
             },
             "algorithms": ",".join(req.algorithms),
             "status": "Running",
@@ -57,87 +57,87 @@ async def start_simulation(
         logger.error(f"시뮬레이션 DB 레코드 생성 실패: {e}")
         raise HTTPException(status_code=500, detail=f"DB 오류: {e}")
 
-    # 인메모리 상태 초기화
     simulation_store.create(run_id)
-
-    # 백그라운드 실행
-    background_tasks.add_task(
-        _run_simulation_background,
-        run_id=run_id,
-        req=req,
-    )
-
+    background_tasks.add_task(_run_simulation_background, run_id=run_id, req=req)
     return SimulationRunResponse(runId=run_id, status="Running")
 
 
 @router.get("/status/{run_id}", response_model=SimulationStatusResponse)
 async def get_simulation_status(run_id: str) -> SimulationStatusResponse:
-    """진행률 폴링 (프론트엔드 2초 간격)"""
     state = simulation_store.get(run_id)
     if state is None:
-        # 인메모리에 없으면 DB에서 상태 확인
         try:
             from services.supabase_client import get_supabase
-            supabase = get_supabase()
-            resp = supabase.table("mcs_simulation_run").select("status").eq("id", run_id).single().execute()
+            resp = get_supabase().table("mcs_simulation_run") \
+                .select("status").eq("id", run_id).single().execute()
             db_status = resp.data.get("status", "Unknown") if resp.data else "Unknown"
-            progress = 100 if db_status == "Completed" else 0
+            progress  = 100 if db_status == "Completed" else 0
             return SimulationStatusResponse(runId=run_id, status=db_status, progress=progress)
         except Exception:
             raise HTTPException(status_code=404, detail=f"시뮬레이션 없음: {run_id}")
 
     return SimulationStatusResponse(
-        runId=run_id,
-        status=state.status,
-        progress=state.progress,
+        runId=run_id, status=state.status, progress=state.progress
     )
 
 
 @router.get("/result/{run_id}", response_model=SimulationResultResponse)
 async def get_simulation_result(run_id: str) -> SimulationResultResponse:
-    """시뮬레이션 결과 조회 (Completed 상태에서만 유효)"""
     from services.supabase_client import get_supabase
 
     try:
         supabase = get_supabase()
-
-        # 실행 상태 확인
-        run_resp = supabase.table("mcs_simulation_run").select("status").eq("id", run_id).single().execute()
+        run_resp = supabase.table("mcs_simulation_run") \
+            .select("status").eq("id", run_id).single().execute()
         if not run_resp.data:
             raise HTTPException(status_code=404, detail=f"시뮬레이션 없음: {run_id}")
-
         status = run_resp.data["status"]
 
-        # 결과 조회
-        res_resp = supabase.table("mcs_simulation_result").select("*").eq("simulation_run_id", run_id).execute()
+        res_resp = supabase.table("mcs_simulation_result") \
+            .select("*").eq("simulation_run_id", run_id).execute()
         result_rows = res_resp.data or []
-
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"결과 조회 실패: {e}")
         raise HTTPException(status_code=500, detail=f"DB 오류: {e}")
 
-    # 응답 구성
-    results = [
-        SimulationResultItem(
-            algorithm=row["algorithm"],
-            avgTransferTime=float(row["avg_transfer_time"]),
-            throughput=float(row["throughput"]),
-            collisionCount=int(row["collision_count"]),
-            loadBalanceStd=float(row["load_balance_std"]),
-            equipmentUtilization=float(row["equipment_utilization"]),
-            deadlockCount=int(row["deadlock_count"]),
-            routeEfficiencyScore=float(row["route_efficiency_score"]),
-        )
-        for row in result_rows
-    ]
+    results = [_row_to_result_item(row) for row in result_rows]
 
-    # A* vs AI 비교 지표 계산
-    comparison = _compute_comparison(results)
+    # agent trace + conflict events attach (인메모리)
+    traces_by_alg  = simulation_store.get_agent_traces(run_id) or {}
+    events_by_alg  = simulation_store.get_conflict_events(run_id) or {}
+    for item in results:
+        raw_traces = traces_by_alg.get(item.algorithm)
+        if raw_traces:
+            from models.schemas import AgentTrace, ConflictEvent
+            item.agentTraces = [
+                AgentTrace(
+                    agentId=t.get("agentId", ""),
+                    srcUnit=t.get("srcUnit", ""),
+                    dstUnit=t.get("dstUnit", ""),
+                    path=t.get("path", []),
+                    startTime=t.get("startTime", 0.0),
+                    endTime=t.get("endTime", 0.0),
+                )
+                for t in raw_traces
+                if t.get("path")
+            ]
+        raw_events = events_by_alg.get(item.algorithm)
+        if raw_events:
+            from models.schemas import ConflictEvent
+            item.conflictEvents = [
+                ConflictEvent(
+                    carrierId=e.get("carrierId", ""),
+                    nodeId=e.get("nodeId", ""),
+                    time=e.get("time", 0.0),
+                )
+                for e in raw_events
+            ]
 
-    # 분포 데이터 (분포 기반 추정)
-    distributions = _compute_distributions(results)
+    pvalues = simulation_store.get_pvalues(run_id)
+    comparison    = _compute_comparison(results, pvalues)
+    distributions = _compute_distributions_from_store(run_id, results)
 
     return SimulationResultResponse(
         runId=run_id,
@@ -148,59 +148,196 @@ async def get_simulation_result(run_id: str) -> SimulationResultResponse:
     )
 
 
-# ── 백그라운드 시뮬레이션 실행 ───────────────────────────────────────
+# ── 백그라운드 실행 ───────────────────────────────────────────────
 
 def _run_simulation_background(run_id: str, req: SimulationRunRequest) -> None:
-    """BackgroundTasks에서 동기 실행 (스레드풀)"""
     from services.graph_loader import load_graph
     from services.supabase_client import get_supabase
     from engine.simulation import McsSimulation
-    import json
 
     try:
-        # 그래프 로드
         layout_id = req.scenarioParams.layoutId
         graph, unit_labels = load_graph(layout_id)
 
         scenario_dict = {
-            "layoutId": layout_id,
-            "carrierCount": req.scenarioParams.carrierCount,
+            "layoutId":             layout_id,
+            "carrierCount":         req.scenarioParams.carrierCount,
+            "utilizationRate":      req.scenarioParams.utilizationRate,
             "transferRequestCount": req.scenarioParams.transferRequestCount,
-            "simulationDuration": req.scenarioParams.simulationDuration,
+            "simulationDuration":   req.scenarioParams.simulationDuration,
+            "mode":                 req.scenarioParams.mode,
         }
 
-        # SimPy 시뮬레이션 실행
-        sim = McsSimulation(
-            graph=graph,
-            unit_labels=unit_labels,
-            scenario_params=scenario_dict,
-            algorithms=req.algorithms,
-        )
+        seeds = req.seeds or [None]
+        n_seeds = len([s for s in seeds if s is not None])
+        raw_by_alg: dict = {alg: {} for alg in req.algorithms}
 
-        results = sim.run(
-            progress_callback=lambda p: simulation_store.update_progress(run_id, p)
-        )
+        if n_seeds >= 2:
+            # ── 다중 시드: ExperimentRunner로 통계 + Wilcoxon 검정 ──
+            from engine.experiment_runner import ExperimentRunner
 
-        # 결과 DB 저장
-        supabase = get_supabase()
-        for algorithm, metrics in results.items():
-            supabase.table("mcs_simulation_result").insert({
-                "simulation_run_id": run_id,
-                "algorithm": algorithm,
-                "avg_transfer_time": metrics["avg_transfer_time"],
-                "throughput": metrics["throughput"],
-                "collision_count": metrics["collision_count"],
-                "load_balance_std": metrics["load_balance_std"],
-                "equipment_utilization": metrics["equipment_utilization"],
-                "deadlock_count": metrics["deadlock_count"],
-                "route_efficiency_score": metrics["route_efficiency_score"],
-            }).execute()
+            valid_seeds = [s for s in seeds if s is not None]
+            runner = ExperimentRunner(
+                graph=graph,
+                unit_labels=unit_labels,
+                scenario_params=scenario_dict,
+                progress_callback=lambda p: simulation_store.update_progress(run_id, p),
+            )
+            exp_result = runner.run_replications(
+                algorithms=req.algorithms,
+                seeds=valid_seeds,
+            )
 
-        # 완료 상태 업데이트
+            # raw 데이터를 simulation_store 형식으로 변환
+            for alg in req.algorithms:
+                raw_by_alg[alg] = exp_result["raw"].get(alg, {})
+
+            # Wilcoxon p-value 저장
+            simulation_store.store_pvalues(run_id, exp_result["pairwise_pvalues"])
+
+            # 첫 시드 agent_traces 저장 (재생 뷰용)
+            first_traces = exp_result.get("agent_traces", {})
+            if first_traces:
+                simulation_store.store_agent_traces(run_id, first_traces)
+
+            # per_algorithm → DB 저장용 평균값 추출
+            per_alg = exp_result["per_algorithm"]
+
+            def get_mean(alg: str, key: str) -> float:
+                return per_alg.get(alg, {}).get(key, {}).get("mean", 0.0)
+
+            def get_ci(alg: str, key: str):
+                d = per_alg.get(alg, {}).get(key, {})
+                lo = d.get("ci_low")
+                hi = d.get("ci_high")
+                return lo, hi
+
+            supabase = get_supabase()
+            for alg in req.algorithms:
+                makespan_ci_lo, makespan_ci_hi = get_ci(alg, "makespan")
+                att_ci_lo, att_ci_hi           = get_ci(alg, "avg_transfer_time")
+                fallback_list = raw_by_alg[alg].get("fallback", [])
+                is_fallback   = any(fallback_list) if fallback_list else False
+
+                supabase.table("mcs_simulation_result").insert({
+                    "simulation_run_id":      run_id,
+                    "algorithm":              alg,
+                    "avg_transfer_time":      get_mean(alg, "avg_transfer_time"),
+                    "throughput":             get_mean(alg, "throughput"),
+                    "collision_count":        int(get_mean(alg, "collision_count")),
+                    "load_balance_std":       0.0,
+                    "equipment_utilization":  get_mean(alg, "equipment_utilization"),
+                    "deadlock_count":         int(get_mean(alg, "deadlock_count")),
+                    "route_efficiency_score": get_mean(alg, "route_efficiency_score"),
+                }).execute()
+
+                try:
+                    supabase.table("mcs_simulation_result").update({
+                        "makespan":                  get_mean(alg, "makespan"),
+                        "sum_of_costs":              get_mean(alg, "sum_of_costs"),
+                        "avg_wait_time":             get_mean(alg, "avg_wait_time"),
+                        "amr_utilization":           get_mean(alg, "amr_utilization"),
+                        "deadlock_rate":             get_mean(alg, "deadlock_rate"),
+                        "path_optimality":           get_mean(alg, "path_optimality"),
+                        "conflict_count":            int(get_mean(alg, "conflict_count")),
+                        "makespan_ci_low":           makespan_ci_lo,
+                        "makespan_ci_high":          makespan_ci_hi,
+                        "avg_transfer_time_ci_low":  att_ci_lo,
+                        "avg_transfer_time_ci_high": att_ci_hi,
+                        "seed_count":                n_seeds,
+                        "fallback":                  is_fallback,
+                    }).eq("simulation_run_id", run_id).eq("algorithm", alg).execute()
+                except Exception as e:
+                    logger.warning(f"저널 메트릭 업데이트 건너뜀 (Migration 009 미적용?): {e}")
+
+        else:
+            # ── 단일 시드: 기존 방식 ──
+            seed = seeds[0] if seeds else None
+
+            sim = McsSimulation(
+                graph=graph,
+                unit_labels=unit_labels,
+                scenario_params=scenario_dict,
+                algorithms=req.algorithms,
+                seed=seed,
+            )
+            results_this_seed = sim.run(
+                progress_callback=lambda p: simulation_store.update_progress(run_id, int(p))
+            )
+            for alg, metrics in results_this_seed.items():
+                for k, v in metrics.items():
+                    # list-of-dict 필드는 덮어쓰기 (시드 단일이므로)
+                    if k in ("agent_traces", "conflict_events"):
+                        raw_by_alg[alg][k] = v
+                        continue
+                    if k not in raw_by_alg[alg]:
+                        raw_by_alg[alg][k] = []
+                    if isinstance(v, list):
+                        raw_by_alg[alg][k].extend(v)
+                    else:
+                        raw_by_alg[alg][k].append(v)
+
+            supabase = get_supabase()
+            for alg, metric_lists in raw_by_alg.items():
+                def avg(k: str, default: float = 0.0) -> float:
+                    vals = metric_lists.get(k)
+                    if vals and isinstance(vals[0], (int, float)):
+                        return float(sum(vals) / len(vals))
+                    return default
+
+                fallback_list = metric_lists.get("fallback", [])
+                is_fallback   = any(fallback_list) if fallback_list else False
+
+                supabase.table("mcs_simulation_result").insert({
+                    "simulation_run_id":      run_id,
+                    "algorithm":              alg,
+                    "avg_transfer_time":      avg("avg_transfer_time"),
+                    "throughput":             avg("throughput"),
+                    "collision_count":        int(avg("collision_count")),
+                    "load_balance_std":       avg("load_balance_std"),
+                    "equipment_utilization":  avg("equipment_utilization"),
+                    "deadlock_count":         int(avg("deadlock_count")),
+                    "route_efficiency_score": avg("route_efficiency_score"),
+                }).execute()
+
+                try:
+                    supabase.table("mcs_simulation_result").update({
+                        "makespan":       avg("makespan"),
+                        "sum_of_costs":   avg("sum_of_costs"),
+                        "avg_wait_time":  avg("avg_wait_time"),
+                        "amr_utilization": avg("amr_utilization"),
+                        "deadlock_rate":  avg("deadlock_rate"),
+                        "path_optimality": avg("path_optimality"),
+                        "conflict_count": int(avg("conflict_count")),
+                        "seed_count":     1,
+                        "fallback":       is_fallback,
+                    }).eq("simulation_run_id", run_id).eq("algorithm", alg).execute()
+                except Exception as e:
+                    logger.warning(f"저널 메트릭 업데이트 건너뜀 (Migration 009 미적용?): {e}")
+
         supabase.table("mcs_simulation_run").update({
             "status": "Completed",
             "completed_at": datetime.now(timezone.utc).isoformat(),
         }).eq("id", run_id).execute()
+
+        # raw 분포 데이터 저장 (분포 차트용)
+        simulation_store.store_raw(run_id, raw_by_alg)
+
+        # agent trace + conflict events 저장 (재생 뷰용)
+        agent_traces_by_alg: dict = {}
+        conflict_events_by_alg: dict = {}
+        for alg in req.algorithms:
+            traces = raw_by_alg[alg].get("agent_traces")
+            if traces:
+                if isinstance(traces[0], list):
+                    agent_traces_by_alg[alg] = traces[0]
+                else:
+                    agent_traces_by_alg[alg] = traces
+            events = raw_by_alg[alg].get("conflict_events")
+            if events:
+                conflict_events_by_alg[alg] = events
+        simulation_store.store_agent_traces(run_id, agent_traces_by_alg)
+        simulation_store.store_conflict_events(run_id, conflict_events_by_alg)
 
         simulation_store.complete(run_id)
         logger.info(f"시뮬레이션 완료: {run_id}")
@@ -218,78 +355,145 @@ def _run_simulation_background(run_id: str, req: SimulationRunRequest) -> None:
             pass
 
 
-# ── 분석 유틸리티 ─────────────────────────────────────────────────
+# ── 유틸 ─────────────────────────────────────────────────────────
 
-def _compute_comparison(results: list[SimulationResultItem]) -> SimulationComparison | None:
-    """A* vs AI 비교 지표 계산"""
-    astar = next((r for r in results if r.algorithm == "astar"), None)
-    ai = next((r for r in results if r.algorithm == "ai_ppo"), None)
-    if not astar or not ai:
-        return None
+def _row_to_result_item(row: dict) -> SimulationResultItem:
+    def _f(key: str, default: float = 0.0) -> float:
+        v = row.get(key)
+        return float(v) if v is not None else default
 
-    def pct_change(old: float, new: float) -> float:
-        if old == 0:
-            return 0.0
-        return round((new - old) / old * 100.0, 1)
+    def _opt_f(key: str):
+        v = row.get(key)
+        return float(v) if v is not None else None
 
-    transfer_time_reduction = pct_change(astar.avgTransferTime, ai.avgTransferTime) * -1
-    utilization_increase = pct_change(astar.equipmentUtilization, ai.equipmentUtilization)
-    # A*와 AI 모두 0이면 교착 없음 → 개선율 0%
-    if astar.deadlockCount == 0 and ai.deadlockCount == 0:
-        deadlock_elimination = 0.0
-    elif astar.deadlockCount > 0 and ai.deadlockCount == 0:
-        deadlock_elimination = 100.0
-    else:
-        deadlock_elimination = round((1 - ai.deadlockCount / max(astar.deadlockCount, 1)) * 100.0, 1)
-    efficiency_increase = pct_change(astar.routeEfficiencyScore, ai.routeEfficiencyScore)
-    throughput_increase = pct_change(astar.throughput, ai.throughput)
-
-    return SimulationComparison(
-        transferTimeReduction=max(transfer_time_reduction, 0.0),
-        utilizationIncrease=max(utilization_increase, 0.0),
-        deadlockElimination=max(deadlock_elimination, 0.0),
-        efficiencyIncrease=max(efficiency_increase, 0.0),
-        throughputIncrease=max(throughput_increase, 0.0),
+    return SimulationResultItem(
+        algorithm=row["algorithm"],
+        makespan=_f("makespan"),
+        sumOfCosts=_f("sum_of_costs"),
+        avgTransferTime=_f("avg_transfer_time"),
+        avgWaitTime=_f("avg_wait_time"),
+        amrUtilization=_f("amr_utilization"),
+        throughput=_f("throughput"),
+        deadlockCount=int(_f("deadlock_count")),
+        deadlockRate=_f("deadlock_rate"),
+        pathOptimality=_f("path_optimality"),
+        conflictCount=int(_f("conflict_count")),
+        collisionCount=int(_f("collision_count")),
+        loadBalanceStd=_f("load_balance_std"),
+        equipmentUtilization=_f("equipment_utilization"),
+        routeEfficiencyScore=_f("route_efficiency_score"),
+        makespanCiLow=_opt_f("makespan_ci_low") or 0.0,
+        makespanCiHigh=_opt_f("makespan_ci_high") or 0.0,
+        avgTransferTimeCiLow=_opt_f("avg_transfer_time_ci_low") or 0.0,
+        avgTransferTimeCiHigh=_opt_f("avg_transfer_time_ci_high") or 0.0,
+        seedCount=int(row.get("seed_count") or 1),
+        fallback=bool(row.get("fallback", False)),
     )
 
 
-def _compute_distributions(results: list[SimulationResultItem]) -> dict:
-    """시간 분포 및 장비 가동률 분포 데이터 생성"""
+def _compute_comparison(
+    results: list,
+    pvalues: Optional[dict] = None,
+) -> Optional[SimulationComparison]:
+    """A* 기준 N-알고리즘 비교 (부호 보존, 클램프 없음)"""
     astar = next((r for r in results if r.algorithm == "astar"), None)
-    ai = next((r for r in results if r.algorithm == "ai_ppo"), None)
+    if not astar:
+        return None
 
-    # 반송 시간 분포 (avg_transfer_time 기반 추정)
-    transfer_time_dist = []
-    ranges = ["0-5s", "5-10s", "10-15s", "15-20s", "20s+"]
-    for i, rng in enumerate(ranges):
-        # 정규 분포 추정: 평균 근처 구간에 집중
-        astar_count = _estimate_distribution_count(astar.avgTransferTime if astar else 10.0, i)
-        ai_count = _estimate_distribution_count(ai.avgTransferTime if ai else 8.0, i)
-        transfer_time_dist.append({"range": rng, "astar": astar_count, "ai_ppo": ai_count})
+    def pct(old: float, new: float) -> float:
+        return round((new - old) / old * 100.0, 1) if old != 0 else 0.0
 
-    # 장비 가동률 분포 (equipmentUtilization 기반 추정)
+    others = [r for r in results if r.algorithm != "astar"]
+    if not others:
+        return None
+
+    best_time = min(others, key=lambda r: r.avgTransferTime)
+    best_util = max(others, key=lambda r: r.amrUtilization)
+
+    transfer_reduction = pct(astar.avgTransferTime, best_time.avgTransferTime) * -1
+    util_increase      = pct(astar.amrUtilization,  best_util.amrUtilization)
+
+    if astar.deadlockCount == 0:
+        deadlock_elim = 0.0
+    else:
+        best_deadlock = min(others, key=lambda r: r.deadlockCount)
+        deadlock_elim = round(
+            (1 - best_deadlock.deadlockCount / max(astar.deadlockCount, 1)) * 100.0, 1
+        )
+
+    best_eff  = max(others, key=lambda r: r.pathOptimality)
+    best_thru = max(others, key=lambda r: r.throughput)
+
+    # Wilcoxon p-value (ExperimentRunner가 저장한 데이터)
+    pairwise_pv = None
+    if pvalues:
+        # 키 형식: {"makespan": {"astar__vs__cbs_ts": 0.001, ...}, ...}
+        pairwise_pv = PairwisePvalues(
+            makespan=pvalues.get("makespan", {}),
+            sumOfCosts=pvalues.get("sum_of_costs", {}),
+            avgTransferTime=pvalues.get("avg_transfer_time", {}),
+            pathOptimality=pvalues.get("path_optimality", {}),
+        )
+
+    return SimulationComparison(
+        transferTimeReduction=transfer_reduction,
+        utilizationIncrease=util_increase,
+        deadlockElimination=deadlock_elim,
+        efficiencyIncrease=pct(astar.pathOptimality, best_eff.pathOptimality),
+        throughputIncrease=pct(astar.throughput,     best_thru.throughput),
+        pairwisePvalues=pairwise_pv,
+    )
+
+
+def _compute_distributions_from_store(run_id: str, results: list[SimulationResultItem]) -> dict:
+    """인메모리 raw 데이터 기반 진짜 분포 — 가짜 추정 데이터 없음"""
+    raw_by_alg = simulation_store.get_raw(run_id) or {}
+
+    # ── 반송 시간 히스토그램 (raw_transfer_times 기반) ──
+    bins = [0, 5, 10, 15, 20, 30, 60, float("inf")]
+    bin_labels = ["0-5s", "5-10s", "10-15s", "15-20s", "20-30s", "30-60s", "60s+"]
+
+    transfer_time_dist = [{
+        "range": label, **{
+            alg: int(np.histogram(
+                raw_by_alg.get(alg, {}).get("raw_transfer_times", [0]),
+                bins=bins
+            )[0][i])
+            for alg in (raw_by_alg.keys() or [r.algorithm for r in results])
+        }
+    } for i, label in enumerate(bin_labels)]
+
+    # ── 장비별 가동률 (equipment_busy 기반) ──
+    # 모든 알고리즘에 공통 equipment 집합
+    all_equip: set = set()
+    for alg_data in raw_by_alg.values():
+        eq_busy = alg_data.get("equipment_busy", {})
+        if isinstance(eq_busy, list) and eq_busy:
+            # 여러 시드 dict의 키 합집합
+            for d in eq_busy:
+                if isinstance(d, dict):
+                    all_equip.update(d.keys())
+        elif isinstance(eq_busy, dict):
+            all_equip.update(eq_busy.keys())
+
     equipment_util_dist = []
-    equipment_labels = ["Stocker-A", "Stocker-B", "Process-A", "Process-B", "Node-1"]
-    for label in equipment_labels:
-        astar_util = round((astar.equipmentUtilization if astar else 65.0) + (hash(label) % 20) - 10, 1)
-        ai_util = round((ai.equipmentUtilization if ai else 80.0) + (hash(label) % 15) - 7, 1)
-        equipment_util_dist.append({
-            "equipment": label,
-            "astar": max(0.0, min(100.0, astar_util)),
-            "ai_ppo": max(0.0, min(100.0, ai_util)),
-        })
+    for eq in sorted(all_equip):
+        row: dict = {"equipment": eq}
+        for alg, alg_data in raw_by_alg.items():
+            eq_busy = alg_data.get("equipment_busy", {})
+            if isinstance(eq_busy, list):
+                util_vals = [
+                    d.get(eq, 0.0) for d in eq_busy if isinstance(d, dict)
+                ]
+                row[alg] = round(sum(util_vals) / len(util_vals), 1) if util_vals else 0.0
+            elif isinstance(eq_busy, dict):
+                row[alg] = round(eq_busy.get(eq, 0.0), 1)
+            else:
+                row[alg] = 0.0
+        equipment_util_dist.append(row)
 
+    # equipment가 없으면 빈 리스트 반환 (가짜 데이터 금지)
     return {
-        "transferTime": transfer_time_dist,
+        "transferTime":         transfer_time_dist,
         "equipmentUtilization": equipment_util_dist,
     }
-
-
-def _estimate_distribution_count(avg_sec: float, range_idx: int) -> int:
-    """평균 반송 시간 기반 구간별 건수 추정 (삼각 분포 모사)"""
-    # 구간 중간값 (초): 2.5, 7.5, 12.5, 17.5, 22.5
-    midpoints = [2.5, 7.5, 12.5, 17.5, 22.5]
-    mid = midpoints[range_idx]
-    diff = abs(mid - avg_sec)
-    count = max(0, int(10 - diff * 0.8))
-    return count

@@ -17,9 +17,12 @@ async def health_check() -> HealthResponse:
 
     supabase_ok = check_connection()
 
+    from engine.cactus.qmix_agent import qmix_agent
+
     return HealthResponse(
         status="ok",
         modelLoaded=ppo_agent.is_loaded,
         modelPath=ppo_agent.model_path or settings.model_path,
         supabaseConnected=supabase_ok,
+        cactusLoaded=qmix_agent.is_loaded,
     )

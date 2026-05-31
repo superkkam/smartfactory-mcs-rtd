@@ -1,0 +1,919 @@
+{
+  "layout_id": "synthetic_fab_3bay",
+  "layout_name": "Synthetic 3-Bay Semiconductor Fab AMHS",
+  "node_count": 76,
+  "port_count": 14,
+  "edge_count": 90,
+  "node_order": [
+    "U00",
+    "U01",
+    "U02",
+    "U03",
+    "U04",
+    "U05",
+    "U06",
+    "U07",
+    "U08",
+    "U09",
+    "U10",
+    "U11",
+    "U12",
+    "U13",
+    "U14",
+    "L00",
+    "L01",
+    "L02",
+    "L03",
+    "L04",
+    "L05",
+    "L06",
+    "L07",
+    "L08",
+    "L09",
+    "L10",
+    "L11",
+    "L12",
+    "L13",
+    "L14",
+    "RT1",
+    "RT2",
+    "LT1",
+    "LT2",
+    "IN_S01",
+    "S01",
+    "OUT_S01",
+    "IN_P01",
+    "P01",
+    "OUT_P01",
+    "IN_P02",
+    "P02",
+    "OUT_P02",
+    "IN_P03",
+    "P03",
+    "OUT_P03",
+    "IN_P04",
+    "P04",
+    "OUT_P04",
+    "IN_P05",
+    "P05",
+    "OUT_P05",
+    "IN_P06",
+    "P06",
+    "OUT_P06",
+    "IN_P07",
+    "P07",
+    "OUT_P07",
+    "IN_P08",
+    "P08",
+    "OUT_P08",
+    "IN_P09",
+    "P09",
+    "OUT_P09",
+    "IN_P10",
+    "P10",
+    "OUT_P10",
+    "IN_P11",
+    "P11",
+    "OUT_P11",
+    "IN_P12",
+    "P12",
+    "OUT_P12",
+    "IN_S02",
+    "S02",
+    "OUT_S02"
+  ],
+  "nodes": [
+    {
+      "id": "U00",
+      "unit_type": "Conveyor",
+      "label": "U00"
+    },
+    {
+      "id": "U01",
+      "unit_type": "Conveyor",
+      "label": "U01"
+    },
+    {
+      "id": "U02",
+      "unit_type": "Conveyor",
+      "label": "U02"
+    },
+    {
+      "id": "U03",
+      "unit_type": "Conveyor",
+      "label": "U03"
+    },
+    {
+      "id": "U04",
+      "unit_type": "Conveyor",
+      "label": "U04"
+    },
+    {
+      "id": "U05",
+      "unit_type": "Conveyor",
+      "label": "U05"
+    },
+    {
+      "id": "U06",
+      "unit_type": "Conveyor",
+      "label": "U06"
+    },
+    {
+      "id": "U07",
+      "unit_type": "Conveyor",
+      "label": "U07"
+    },
+    {
+      "id": "U08",
+      "unit_type": "Conveyor",
+      "label": "U08"
+    },
+    {
+      "id": "U09",
+      "unit_type": "Conveyor",
+      "label": "U09"
+    },
+    {
+      "id": "U10",
+      "unit_type": "Conveyor",
+      "label": "U10"
+    },
+    {
+      "id": "U11",
+      "unit_type": "Conveyor",
+      "label": "U11"
+    },
+    {
+      "id": "U12",
+      "unit_type": "Conveyor",
+      "label": "U12"
+    },
+    {
+      "id": "U13",
+      "unit_type": "Conveyor",
+      "label": "U13"
+    },
+    {
+      "id": "U14",
+      "unit_type": "Conveyor",
+      "label": "U14"
+    },
+    {
+      "id": "L00",
+      "unit_type": "Conveyor",
+      "label": "L00"
+    },
+    {
+      "id": "L01",
+      "unit_type": "Conveyor",
+      "label": "L01"
+    },
+    {
+      "id": "L02",
+      "unit_type": "Conveyor",
+      "label": "L02"
+    },
+    {
+      "id": "L03",
+      "unit_type": "Conveyor",
+      "label": "L03"
+    },
+    {
+      "id": "L04",
+      "unit_type": "Conveyor",
+      "label": "L04"
+    },
+    {
+      "id": "L05",
+      "unit_type": "Conveyor",
+      "label": "L05"
+    },
+    {
+      "id": "L06",
+      "unit_type": "Conveyor",
+      "label": "L06"
+    },
+    {
+      "id": "L07",
+      "unit_type": "Conveyor",
+      "label": "L07"
+    },
+    {
+      "id": "L08",
+      "unit_type": "Conveyor",
+      "label": "L08"
+    },
+    {
+      "id": "L09",
+      "unit_type": "Conveyor",
+      "label": "L09"
+    },
+    {
+      "id": "L10",
+      "unit_type": "Conveyor",
+      "label": "L10"
+    },
+    {
+      "id": "L11",
+      "unit_type": "Conveyor",
+      "label": "L11"
+    },
+    {
+      "id": "L12",
+      "unit_type": "Conveyor",
+      "label": "L12"
+    },
+    {
+      "id": "L13",
+      "unit_type": "Conveyor",
+      "label": "L13"
+    },
+    {
+      "id": "L14",
+      "unit_type": "Conveyor",
+      "label": "L14"
+    },
+    {
+      "id": "RT1",
+      "unit_type": "Conveyor",
+      "label": "RT1"
+    },
+    {
+      "id": "RT2",
+      "unit_type": "Conveyor",
+      "label": "RT2"
+    },
+    {
+      "id": "LT1",
+      "unit_type": "Conveyor",
+      "label": "LT1"
+    },
+    {
+      "id": "LT2",
+      "unit_type": "Conveyor",
+      "label": "LT2"
+    },
+    {
+      "id": "IN_S01",
+      "unit_type": "Conveyor",
+      "label": "IN_S01"
+    },
+    {
+      "id": "S01",
+      "unit_type": "Port",
+      "label": "STOCKER-1"
+    },
+    {
+      "id": "OUT_S01",
+      "unit_type": "Conveyor",
+      "label": "OUT_S01"
+    },
+    {
+      "id": "IN_P01",
+      "unit_type": "Conveyor",
+      "label": "IN_P01"
+    },
+    {
+      "id": "P01",
+      "unit_type": "Port",
+      "label": "PROC-A1-IN"
+    },
+    {
+      "id": "OUT_P01",
+      "unit_type": "Conveyor",
+      "label": "OUT_P01"
+    },
+    {
+      "id": "IN_P02",
+      "unit_type": "Conveyor",
+      "label": "IN_P02"
+    },
+    {
+      "id": "P02",
+      "unit_type": "Port",
+      "label": "PROC-A2-IN"
+    },
+    {
+      "id": "OUT_P02",
+      "unit_type": "Conveyor",
+      "label": "OUT_P02"
+    },
+    {
+      "id": "IN_P03",
+      "unit_type": "Conveyor",
+      "label": "IN_P03"
+    },
+    {
+      "id": "P03",
+      "unit_type": "Port",
+      "label": "PROC-A3-IN"
+    },
+    {
+      "id": "OUT_P03",
+      "unit_type": "Conveyor",
+      "label": "OUT_P03"
+    },
+    {
+      "id": "IN_P04",
+      "unit_type": "Conveyor",
+      "label": "IN_P04"
+    },
+    {
+      "id": "P04",
+      "unit_type": "Port",
+      "label": "PROC-A4-IN"
+    },
+    {
+      "id": "OUT_P04",
+      "unit_type": "Conveyor",
+      "label": "OUT_P04"
+    },
+    {
+      "id": "IN_P05",
+      "unit_type": "Conveyor",
+      "label": "IN_P05"
+    },
+    {
+      "id": "P05",
+      "unit_type": "Port",
+      "label": "PROC-B1-IN"
+    },
+    {
+      "id": "OUT_P05",
+      "unit_type": "Conveyor",
+      "label": "OUT_P05"
+    },
+    {
+      "id": "IN_P06",
+      "unit_type": "Conveyor",
+      "label": "IN_P06"
+    },
+    {
+      "id": "P06",
+      "unit_type": "Port",
+      "label": "PROC-B2-IN"
+    },
+    {
+      "id": "OUT_P06",
+      "unit_type": "Conveyor",
+      "label": "OUT_P06"
+    },
+    {
+      "id": "IN_P07",
+      "unit_type": "Conveyor",
+      "label": "IN_P07"
+    },
+    {
+      "id": "P07",
+      "unit_type": "Port",
+      "label": "PROC-B3-IN"
+    },
+    {
+      "id": "OUT_P07",
+      "unit_type": "Conveyor",
+      "label": "OUT_P07"
+    },
+    {
+      "id": "IN_P08",
+      "unit_type": "Conveyor",
+      "label": "IN_P08"
+    },
+    {
+      "id": "P08",
+      "unit_type": "Port",
+      "label": "PROC-B4-IN"
+    },
+    {
+      "id": "OUT_P08",
+      "unit_type": "Conveyor",
+      "label": "OUT_P08"
+    },
+    {
+      "id": "IN_P09",
+      "unit_type": "Conveyor",
+      "label": "IN_P09"
+    },
+    {
+      "id": "P09",
+      "unit_type": "Port",
+      "label": "PROC-C1-IN"
+    },
+    {
+      "id": "OUT_P09",
+      "unit_type": "Conveyor",
+      "label": "OUT_P09"
+    },
+    {
+      "id": "IN_P10",
+      "unit_type": "Conveyor",
+      "label": "IN_P10"
+    },
+    {
+      "id": "P10",
+      "unit_type": "Port",
+      "label": "PROC-C2-IN"
+    },
+    {
+      "id": "OUT_P10",
+      "unit_type": "Conveyor",
+      "label": "OUT_P10"
+    },
+    {
+      "id": "IN_P11",
+      "unit_type": "Conveyor",
+      "label": "IN_P11"
+    },
+    {
+      "id": "P11",
+      "unit_type": "Port",
+      "label": "PROC-C3-IN"
+    },
+    {
+      "id": "OUT_P11",
+      "unit_type": "Conveyor",
+      "label": "OUT_P11"
+    },
+    {
+      "id": "IN_P12",
+      "unit_type": "Conveyor",
+      "label": "IN_P12"
+    },
+    {
+      "id": "P12",
+      "unit_type": "Port",
+      "label": "PROC-C4-IN"
+    },
+    {
+      "id": "OUT_P12",
+      "unit_type": "Conveyor",
+      "label": "OUT_P12"
+    },
+    {
+      "id": "IN_S02",
+      "unit_type": "Conveyor",
+      "label": "IN_S02"
+    },
+    {
+      "id": "S02",
+      "unit_type": "Port",
+      "label": "STOCKER-2"
+    },
+    {
+      "id": "OUT_S02",
+      "unit_type": "Conveyor",
+      "label": "OUT_S02"
+    }
+  ],
+  "edges": [
+    {
+      "source": "U00",
+      "target": "U01",
+      "weight": 3.0
+    },
+    {
+      "source": "U01",
+      "target": "U02",
+      "weight": 3.0
+    },
+    {
+      "source": "U02",
+      "target": "U03",
+      "weight": 3.0
+    },
+    {
+      "source": "U03",
+      "target": "U04",
+      "weight": 3.0
+    },
+    {
+      "source": "U04",
+      "target": "U05",
+      "weight": 3.0
+    },
+    {
+      "source": "U05",
+      "target": "U06",
+      "weight": 3.0
+    },
+    {
+      "source": "U06",
+      "target": "U07",
+      "weight": 3.0
+    },
+    {
+      "source": "U07",
+      "target": "U08",
+      "weight": 3.0
+    },
+    {
+      "source": "U08",
+      "target": "U09",
+      "weight": 3.0
+    },
+    {
+      "source": "U09",
+      "target": "U10",
+      "weight": 3.0
+    },
+    {
+      "source": "U10",
+      "target": "U11",
+      "weight": 3.0
+    },
+    {
+      "source": "U11",
+      "target": "U12",
+      "weight": 3.0
+    },
+    {
+      "source": "U12",
+      "target": "U13",
+      "weight": 3.0
+    },
+    {
+      "source": "U13",
+      "target": "U14",
+      "weight": 3.0
+    },
+    {
+      "source": "L14",
+      "target": "L13",
+      "weight": 3.0
+    },
+    {
+      "source": "L13",
+      "target": "L12",
+      "weight": 3.0
+    },
+    {
+      "source": "L12",
+      "target": "L11",
+      "weight": 3.0
+    },
+    {
+      "source": "L11",
+      "target": "L10",
+      "weight": 3.0
+    },
+    {
+      "source": "L10",
+      "target": "L09",
+      "weight": 3.0
+    },
+    {
+      "source": "L09",
+      "target": "L08",
+      "weight": 3.0
+    },
+    {
+      "source": "L08",
+      "target": "L07",
+      "weight": 3.0
+    },
+    {
+      "source": "L07",
+      "target": "L06",
+      "weight": 3.0
+    },
+    {
+      "source": "L06",
+      "target": "L05",
+      "weight": 3.0
+    },
+    {
+      "source": "L05",
+      "target": "L04",
+      "weight": 3.0
+    },
+    {
+      "source": "L04",
+      "target": "L03",
+      "weight": 3.0
+    },
+    {
+      "source": "L03",
+      "target": "L02",
+      "weight": 3.0
+    },
+    {
+      "source": "L02",
+      "target": "L01",
+      "weight": 3.0
+    },
+    {
+      "source": "L01",
+      "target": "L00",
+      "weight": 3.0
+    },
+    {
+      "source": "U14",
+      "target": "RT1",
+      "weight": 2.0
+    },
+    {
+      "source": "RT1",
+      "target": "RT2",
+      "weight": 2.0
+    },
+    {
+      "source": "RT2",
+      "target": "L14",
+      "weight": 2.0
+    },
+    {
+      "source": "L00",
+      "target": "LT1",
+      "weight": 2.0
+    },
+    {
+      "source": "LT1",
+      "target": "LT2",
+      "weight": 2.0
+    },
+    {
+      "source": "LT2",
+      "target": "U00",
+      "weight": 2.0
+    },
+    {
+      "source": "U01",
+      "target": "IN_S01",
+      "weight": 1.5
+    },
+    {
+      "source": "IN_S01",
+      "target": "S01",
+      "weight": 1.0
+    },
+    {
+      "source": "S01",
+      "target": "OUT_S01",
+      "weight": 1.0
+    },
+    {
+      "source": "OUT_S01",
+      "target": "L01",
+      "weight": 1.5
+    },
+    {
+      "source": "U02",
+      "target": "IN_P01",
+      "weight": 1.5
+    },
+    {
+      "source": "IN_P01",
+      "target": "P01",
+      "weight": 1.0
+    },
+    {
+      "source": "P01",
+      "target": "OUT_P01",
+      "weight": 1.0
+    },
+    {
+      "source": "OUT_P01",
+      "target": "L02",
+      "weight": 1.5
+    },
+    {
+      "source": "U03",
+      "target": "IN_P02",
+      "weight": 1.5
+    },
+    {
+      "source": "IN_P02",
+      "target": "P02",
+      "weight": 1.0
+    },
+    {
+      "source": "P02",
+      "target": "OUT_P02",
+      "weight": 1.0
+    },
+    {
+      "source": "OUT_P02",
+      "target": "L03",
+      "weight": 1.5
+    },
+    {
+      "source": "U04",
+      "target": "IN_P03",
+      "weight": 1.5
+    },
+    {
+      "source": "IN_P03",
+      "target": "P03",
+      "weight": 1.0
+    },
+    {
+      "source": "P03",
+      "target": "OUT_P03",
+      "weight": 1.0
+    },
+    {
+      "source": "OUT_P03",
+      "target": "L04",
+      "weight": 1.5
+    },
+    {
+      "source": "U05",
+      "target": "IN_P04",
+      "weight": 1.5
+    },
+    {
+      "source": "IN_P04",
+      "target": "P04",
+      "weight": 1.0
+    },
+    {
+      "source": "P04",
+      "target": "OUT_P04",
+      "weight": 1.0
+    },
+    {
+      "source": "OUT_P04",
+      "target": "L05",
+      "weight": 1.5
+    },
+    {
+      "source": "U06",
+      "target": "IN_P05",
+      "weight": 1.5
+    },
+    {
+      "source": "IN_P05",
+      "target": "P05",
+      "weight": 1.0
+    },
+    {
+      "source": "P05",
+      "target": "OUT_P05",
+      "weight": 1.0
+    },
+    {
+      "source": "OUT_P05",
+      "target": "L06",
+      "weight": 1.5
+    },
+    {
+      "source": "U07",
+      "target": "IN_P06",
+      "weight": 1.5
+    },
+    {
+      "source": "IN_P06",
+      "target": "P06",
+      "weight": 1.0
+    },
+    {
+      "source": "P06",
+      "target": "OUT_P06",
+      "weight": 1.0
+    },
+    {
+      "source": "OUT_P06",
+      "target": "L07",
+      "weight": 1.5
+    },
+    {
+      "source": "U08",
+      "target": "IN_P07",
+      "weight": 1.5
+    },
+    {
+      "source": "IN_P07",
+      "target": "P07",
+      "weight": 1.0
+    },
+    {
+      "source": "P07",
+      "target": "OUT_P07",
+      "weight": 1.0
+    },
+    {
+      "source": "OUT_P07",
+      "target": "L08",
+      "weight": 1.5
+    },
+    {
+      "source": "U09",
+      "target": "IN_P08",
+      "weight": 1.5
+    },
+    {
+      "source": "IN_P08",
+      "target": "P08",
+      "weight": 1.0
+    },
+    {
+      "source": "P08",
+      "target": "OUT_P08",
+      "weight": 1.0
+    },
+    {
+      "source": "OUT_P08",
+      "target": "L09",
+      "weight": 1.5
+    },
+    {
+      "source": "U10",
+      "target": "IN_P09",
+      "weight": 1.5
+    },
+    {
+      "source": "IN_P09",
+      "target": "P09",
+      "weight": 1.0
+    },
+    {
+      "source": "P09",
+      "target": "OUT_P09",
+      "weight": 1.0
+    },
+    {
+      "source": "OUT_P09",
+      "target": "L10",
+      "weight": 1.5
+    },
+    {
+      "source": "U11",
+      "target": "IN_P10",
+      "weight": 1.5
+    },
+    {
+      "source": "IN_P10",
+      "target": "P10",
+      "weight": 1.0
+    },
+    {
+      "source": "P10",
+      "target": "OUT_P10",
+      "weight": 1.0
+    },
+    {
+      "source": "OUT_P10",
+      "target": "L11",
+      "weight": 1.5
+    },
+    {
+      "source": "U12",
+      "target": "IN_P11",
+      "weight": 1.5
+    },
+    {
+      "source": "IN_P11",
+      "target": "P11",
+      "weight": 1.0
+    },
+    {
+      "source": "P11",
+      "target": "OUT_P11",
+      "weight": 1.0
+    },
+    {
+      "source": "OUT_P11",
+      "target": "L12",
+      "weight": 1.5
+    },
+    {
+      "source": "U13",
+      "target": "IN_P12",
+      "weight": 1.5
+    },
+    {
+      "source": "IN_P12",
+      "target": "P12",
+      "weight": 1.0
+    },
+    {
+      "source": "P12",
+      "target": "OUT_P12",
+      "weight": 1.0
+    },
+    {
+      "source": "OUT_P12",
+      "target": "L13",
+      "weight": 1.5
+    },
+    {
+      "source": "U13",
+      "target": "IN_S02",
+      "weight": 1.5
+    },
+    {
+      "source": "IN_S02",
+      "target": "S02",
+      "weight": 1.0
+    },
+    {
+      "source": "S02",
+      "target": "OUT_S02",
+      "weight": 1.0
+    },
+    {
+      "source": "OUT_S02",
+      "target": "L13",
+      "weight": 1.5
+    }
+  ]
+}

@@ -37,12 +37,22 @@ def train(layout_id: str, total_steps: int, output_path: str) -> None:
     if len(node_list) < 2:
         raise ValueError("학습에 필요한 노드가 부족합니다 (최소 2개).")
 
+    # 시뮬레이션에서 실제 사용되는 Port 노드만 src/dst로 사용
+    # → Port→Port 성공률 최대화 (20노드 × 19 = 380쌍)
+    port_nodes = [n for n, d in graph.nodes(data=True) if d.get("unit_type") == "Port"]
+    train_nodes = port_nodes if len(port_nodes) >= 2 else node_list
+    logger.info(f"학습 src/dst 풀: {len(train_nodes)}개 Port 노드 ({len(train_nodes) * (len(train_nodes)-1)} 쌍)")
+
     import random
 
     def make_env():
-        """랜덤 출발/목적지 환경 생성"""
-        src, dst = random.sample(node_list, 2)
-        return McsRouteEnv(graph, src, dst)
+        """에피소드마다 Port 노드 랜덤 출발/목적지 + BFS 보상 쉐이핑"""
+        src, dst = random.sample(train_nodes, 2)
+        env_inst = McsRouteEnv(graph, src, dst)
+        env_inst._random_reset   = True          # 에피소드마다 새 src/dst
+        env_inst._reward_shaping = True          # BFS 거리 기반 보상 쉐이핑
+        env_inst._train_nodes    = train_nodes   # Port 노드만 샘플
+        return env_inst
 
     # 벡터화 환경 (병렬 학습)
     n_envs = min(4, os.cpu_count() or 1)

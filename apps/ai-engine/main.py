@@ -14,6 +14,7 @@ from config import settings
 from routers.health import router as health_router
 from routers.inference import router as inference_router
 from routers.simulation import router as simulation_router
+from routers.playground import router as playground_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -34,6 +35,14 @@ async def lifespan(app: FastAPI):
         logger.info(f"PPO 모델 로딩 완료: {settings.model_path}")
     else:
         logger.warning("PPO 모델 없음 — A* 폴백 모드로 동작")
+
+    # CACTUS QMix 체크포인트 로딩 시도 (없으면 503 모드)
+    from engine.cactus.qmix_agent import qmix_agent
+    cactus_loaded = qmix_agent.load(settings.cactus_model_path)
+    if cactus_loaded:
+        logger.info(f"CACTUS QMix 로딩 완료: {settings.cactus_model_path}")
+    else:
+        logger.warning("CACTUS 체크포인트 없음 — /inference?algorithm=cactus 503 모드")
 
     yield  # 서버 실행 중
 
@@ -60,6 +69,7 @@ app.add_middleware(
 app.include_router(health_router)
 app.include_router(inference_router)
 app.include_router(simulation_router)
+app.include_router(playground_router)
 
 
 @app.get("/")
